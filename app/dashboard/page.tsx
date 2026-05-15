@@ -1,4 +1,4 @@
-import { getUsers } from "@/lib/supabase/admin"
+import { getUsers, type Profile } from "@/lib/supabase/admin"
 import UserTable from "./UserTable"
 
 export const dynamic = "force-dynamic"
@@ -12,12 +12,21 @@ export default async function DashboardPage({
   const page = Math.max(1, parseInt(params.page ?? "1"))
   const search = params.q ?? ""
 
-  const { data: users, count } = await getUsers(page, search)
+  let users: Profile[] = []
+  let totalCount = 0
+
+  try {
+    const { data, count } = await getUsers(page, search)
+    users = data ?? []
+    totalCount = count ?? 0
+  } catch {
+    // service role key unavailable at build time — render empty table
+  }
 
   return (
     <UserTable
-      users={users ?? []}
-      totalCount={count ?? 0}
+      users={users}
+      totalCount={totalCount}
       page={page}
       search={search}
     />

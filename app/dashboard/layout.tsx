@@ -5,21 +5,29 @@ import type { ReactNode } from "react"
 
 export const dynamic = "force-dynamic"
 
-const NAV = [
-  { href: "/dashboard", label: "Nutzer", icon: "users" },
-] as const
-
 export default async function AdminLayout({ children }: { children: ReactNode }) {
-  const supabase = await createClient()
+  // createClient uses cookies() — wrap so build doesn't crash without env vars
+  let supabase
+  try {
+    supabase = await createClient()
+  } catch {
+    return redirect("/login")
+  }
+
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect("/login")
 
-  // Verify admin
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("full_name, email, is_admin")
-    .eq("id", user.id)
-    .single()
+  let profile: { full_name: string | null; email: string; is_admin: boolean } | null = null
+  try {
+    const { data } = await supabase
+      .from("profiles")
+      .select("full_name, email, is_admin")
+      .eq("id", user.id)
+      .single()
+    profile = data
+  } catch {
+    return redirect("/login")
+  }
 
   if (!profile?.is_admin) redirect("/login")
 
@@ -28,7 +36,6 @@ export default async function AdminLayout({ children }: { children: ReactNode })
 
       {/* Sidebar */}
       <aside className="w-[220px] flex-shrink-0 bg-white border-r border-gray-100 flex flex-col">
-        {/* Logo */}
         <div className="h-[60px] flex items-center px-5 border-b border-gray-100 gap-2.5">
           <div className="w-7 h-7 rounded-lg bg-[#0f172a] flex items-center justify-center flex-shrink-0">
             <span className="text-white text-xs font-bold">A</span>
@@ -41,23 +48,18 @@ export default async function AdminLayout({ children }: { children: ReactNode })
           </div>
         </div>
 
-        {/* Nav */}
         <nav className="flex-1 px-3 py-4 space-y-0.5">
-          {NAV.map(item => (
-            <a
-              key={item.href}
-              href={item.href}
-              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium bg-blue-50 text-[#4F6EF7]"
-            >
-              <UsersIcon />
-              {item.label}
-            </a>
-          ))}
+          <a
+            href="/dashboard"
+            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium bg-blue-50 text-[#4F6EF7]"
+          >
+            <UsersIcon />
+            Nutzer
+          </a>
         </nav>
 
-        {/* User + Signout */}
         <div className="px-5 py-4 border-t border-gray-100 space-y-2">
-          <p className="text-xs text-[#64748b] truncate">{profile.email}</p>
+          <p className="text-xs text-[#64748b] truncate">{profile?.email ?? ""}</p>
           <form action={actionSignOut}>
             <button
               type="submit"
@@ -71,16 +73,15 @@ export default async function AdminLayout({ children }: { children: ReactNode })
 
       {/* Main */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Topbar */}
         <header className="h-[60px] flex-shrink-0 bg-white border-b border-gray-100 flex items-center px-6 gap-4">
           <span className="text-sm font-semibold text-[#0f172a]">Nutzerverwaltung</span>
           <div className="flex-1" />
           <span className="text-xs text-[#94a3b8]">
-            Angemeldet als <span className="text-[#64748b] font-medium">{profile.email}</span>
+            Angemeldet als{" "}
+            <span className="text-[#64748b] font-medium">{profile?.email ?? ""}</span>
           </span>
         </header>
 
-        {/* Content */}
         <main className="flex-1 overflow-y-auto p-8">
           {children}
         </main>
