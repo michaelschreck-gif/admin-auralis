@@ -1,7 +1,6 @@
 import { getUsers, type Profile, type PlanType, type StatusFilter } from "@/lib/supabase/admin"
 import { createClient } from "@/lib/supabase/server"
 import UserTable from "./UserTable"
-import { redirect } from "next/navigation"
 
 export const dynamic = "force-dynamic"
 
@@ -37,14 +36,16 @@ export default async function DashboardPage({
   const plan = parsePlan(params.plan)
 
   // Capture current admin's ID so the UI can disable self-targeting actions.
-  let currentAdminId: string | null = null
+  // The layout already enforces auth + is_admin; we only need the ID here.
+  // Wrap in try/catch so `next build` page-data collection doesn't crash
+  // when Supabase env vars / cookies aren't available.
+  let currentAdminId = ""
   try {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user) redirect("/login")
-    currentAdminId = user.id
+    currentAdminId = user?.id ?? ""
   } catch {
-    redirect("/login")
+    // build-time render; auth will be enforced by layout at request time
   }
 
   let users: Profile[] = []
@@ -66,7 +67,7 @@ export default async function DashboardPage({
       search={search}
       status={status}
       plan={plan}
-      currentAdminId={currentAdminId ?? ""}
+      currentAdminId={currentAdminId}
     />
   )
 }
