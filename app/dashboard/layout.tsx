@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { actionSignOut } from "./actions"
+import { NavLink, UsersIcon, StatsIcon, HeaderTitle } from "./NavLink"
 import type { ReactNode } from "react"
 
 export const dynamic = "force-dynamic"
@@ -49,13 +50,12 @@ export default async function AdminLayout({ children }: { children: ReactNode })
         </div>
 
         <nav className="flex-1 px-3 py-4 space-y-0.5">
-          <a
-            href="/dashboard"
-            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium bg-blue-50 text-[#4F6EF7]"
-          >
-            <UsersIcon />
+          <NavLink href="/dashboard" icon={<UsersIcon />}>
             Nutzer
-          </a>
+          </NavLink>
+          <NavLink href="/dashboard/stats" icon={<StatsIcon />}>
+            Statistiken
+          </NavLink>
         </nav>
 
         <div className="px-5 py-4 border-t border-gray-100 space-y-2">
@@ -74,7 +74,7 @@ export default async function AdminLayout({ children }: { children: ReactNode })
       {/* Main */}
       <div className="flex-1 flex flex-col overflow-hidden">
         <header className="h-[60px] flex-shrink-0 bg-white border-b border-gray-100 flex items-center px-6 gap-4">
-          <span className="text-sm font-semibold text-[#0f172a]">Nutzerverwaltung</span>
+          <HeaderTitle />
           <div className="flex-1" />
           <span className="text-xs text-[#94a3b8]">
             Angemeldet als{" "}
@@ -87,15 +87,5 @@ export default async function AdminLayout({ children }: { children: ReactNode })
         </main>
       </div>
     </div>
-  )
-}
-
-function UsersIcon() {
-  return (
-    <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
-      <circle cx="5.5" cy="4" r="2.5" stroke="currentColor" strokeWidth="1.2"/>
-      <path d="M1 13c0-2.485 2.015-4.5 4.5-4.5S10 10.515 10 13" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
-      <path d="M10.5 6.5a2 2 0 1 0 0-4M14 13c0-2-1.343-3.5-3-3.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
-    </svg>
   )
 }
