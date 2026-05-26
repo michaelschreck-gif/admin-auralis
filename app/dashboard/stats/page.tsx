@@ -95,14 +95,34 @@ export default async function StatsPage() {
           Status des täglichen Cron-Jobs (`/api/cron/run-scheduled-checks` im Haupt-Projekt)
         </p>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
           <HealthCard
-            label="Letzter Run"
+            label="Letzter Cron-Run"
+            ok={isCronHealthy(stats.schedules.lastScheduledRunAt)}
+            value={
+              stats.schedules.lastScheduledRunAt
+                ? new Date(stats.schedules.lastScheduledRunAt).toLocaleString("de-DE", { dateStyle: "short", timeStyle: "short" })
+                : "—"
+            }
+            sub={
+              stats.schedules.lastScheduledRunAt
+                ? relativeTime(stats.schedules.lastScheduledRunAt)
+                : "Cron hat noch nie gelaufen"
+            }
+          />
+          <HealthCard
+            label="Letzte Aktivität"
             ok
-            value={stats.schedules.lastRunAt
-              ? new Date(stats.schedules.lastRunAt).toLocaleString("de-DE", { dateStyle: "short", timeStyle: "short" })
-              : "—"}
-            sub={stats.schedules.lastRunAt ? relativeTime(stats.schedules.lastRunAt) : "Noch nie ausgeführt"}
+            value={
+              stats.schedules.lastActivityAt
+                ? new Date(stats.schedules.lastActivityAt).toLocaleString("de-DE", { dateStyle: "short", timeStyle: "short" })
+                : "—"
+            }
+            sub={
+              stats.schedules.lastActivityAt
+                ? `inkl. manuelle Runs · ${relativeTime(stats.schedules.lastActivityAt)}`
+                : "Noch nie ausgeführt"
+            }
           />
           <HealthCard
             label="Überfällige Topics"
@@ -325,6 +345,13 @@ function DailyBarChart({ data }: { data: { date: string; count: number }[] }) {
       })}
     </svg>
   )
+}
+
+/** A cron run within the last 26h is healthy (allowing some slack on top of the daily schedule). */
+function isCronHealthy(iso: string | null): boolean {
+  if (!iso) return false
+  const ageMs = Date.now() - new Date(iso).getTime()
+  return ageMs < 26 * 60 * 60 * 1000
 }
 
 function relativeTime(iso: string): string {
