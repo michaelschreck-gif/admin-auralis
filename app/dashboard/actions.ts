@@ -8,8 +8,10 @@ import {
   deleteUser,
   inviteUser,
   countAdmins,
+  updateSchedule,
   type PlanType,
   type LanguageType,
+  type FrequencyType,
 } from "@/lib/supabase/admin"
 import { createClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
@@ -122,4 +124,33 @@ export async function actionSignOut() {
   const supabase = await createClient()
   await supabase.auth.signOut()
   redirect("/login")
+}
+
+/* ─────────────────────────────────────────────────────────
+ * Schedule (Topic) actions – used on user detail page
+ * ───────────────────────────────────────────────────────── */
+
+export async function actionUpdateScheduleFrequency(
+  scheduleId: string,
+  frequency: FrequencyType,
+  profileId: string,
+) {
+  await requireAdmin()
+  const { error } = await updateSchedule(scheduleId, { frequency })
+  if (error) throw new Error(error.message)
+  revalidatePath(`/dashboard/users/${profileId}`)
+}
+
+export async function actionToggleSchedule(
+  scheduleId: string,
+  isActive: boolean,
+  profileId: string,
+) {
+  await requireAdmin()
+  // Re-activating? Set next_run_at to now so the next cron pass picks it up.
+  const patch: Parameters<typeof updateSchedule>[1] = { is_active: isActive }
+  if (isActive) patch.next_run_at = new Date().toISOString()
+  const { error } = await updateSchedule(scheduleId, patch)
+  if (error) throw new Error(error.message)
+  revalidatePath(`/dashboard/users/${profileId}`)
 }

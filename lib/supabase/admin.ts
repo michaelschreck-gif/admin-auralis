@@ -120,3 +120,84 @@ export async function countAdmins() {
     .eq("is_admin", true)
   return count ?? 0
 }
+
+/* ─────────────────────────────────────────────────────────
+ * User Detail – profile, topics (schedules), reports
+ * ───────────────────────────────────────────────────────── */
+
+export type MonitoringSchedule = Tables<"monitoring_schedules">
+export type VisibilityReport = Tables<"visibility_reports">
+export type QueryResult = Tables<"query_results">
+export type FrequencyType = Database["public"]["Enums"]["frequency_type"]
+
+export async function getUserById(userId: string) {
+  return adminClient()
+    .from("profiles")
+    .select(
+      "id, email, full_name, avatar_url, plan, language, timezone, is_admin, banned_at, created_at, updated_at",
+    )
+    .eq("id", userId)
+    .single()
+}
+
+export async function getSchedulesForProfile(profileId: string) {
+  return adminClient()
+    .from("monitoring_schedules")
+    .select("*")
+    .eq("profile_id", profileId)
+    .order("created_at", { ascending: true })
+}
+
+export async function getReportsForProfile(profileId: string, limit = 25) {
+  return adminClient()
+    .from("visibility_reports")
+    .select("*")
+    .eq("profile_id", profileId)
+    .order("created_at", { ascending: false })
+    .limit(limit)
+}
+
+export async function getReportWithQueryResults(reportId: string) {
+  const [reportRes, qrRes] = await Promise.all([
+    adminClient()
+      .from("visibility_reports")
+      .select("*")
+      .eq("id", reportId)
+      .single(),
+    adminClient()
+      .from("query_results")
+      .select("*")
+      .eq("report_id", reportId)
+      .order("created_at", { ascending: true }),
+  ])
+  return {
+    report: reportRes.data,
+    reportError: reportRes.error,
+    queryResults: qrRes.data ?? [],
+    queryResultsError: qrRes.error,
+  }
+}
+
+export async function updateSchedule(
+  scheduleId: string,
+  patch: { frequency?: FrequencyType; is_active?: boolean; next_run_at?: string },
+) {
+  return adminClient()
+    .from("monitoring_schedules")
+    .update(patch)
+    .eq("id", scheduleId)
+}
+
+export async function getScheduleById(scheduleId: string) {
+  return adminClient()
+    .from("monitoring_schedules")
+    .select("*")
+    .eq("id", scheduleId)
+    .single()
+}
+
+/** Returns the underlying admin client for code that needs raw access
+ *  (e.g. the manual-analysis runner that performs multiple writes). */
+export function getAdminClient() {
+  return adminClient()
+}
