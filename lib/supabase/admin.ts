@@ -372,3 +372,91 @@ export async function getOverdueSchedules(limit = 20): Promise<OverdueSchedule[]
     hours_overdue: Math.round((now - new Date(s.next_run_at).getTime()) / 3600_000),
   }))
 }
+
+/* ─────────────────────────────────────────────────────────
+ * Audit Log
+ * ───────────────────────────────────────────────────────── */
+
+export type AuditEntry = Tables<"audit_log">
+
+export type AuditActionName =
+  | "user.invite"
+  | "user.plan.update"
+  | "user.profile.update"
+  | "user.ban"
+  | "user.unban"
+  | "user.delete"
+  | "schedule.frequency.update"
+  | "schedule.toggle"
+  | "schedule.analyze.manual"
+
+export type AuditTargetType = "user" | "schedule"
+
+/**
+ * Fire-and-forget audit logger. Failures are logged but never thrown
+ * so the underlying admin action can still succeed and be persisted.
+ */
+export async function logAudit(
+  actorId: string,
+  actorEmail: string | null,
+  action: AuditActionName,
+  options: {
+    targetType?: AuditTargetType
+    targetId?: string
+    payload?: Record<string, unknown>
+  } = {},
+): Promise<void> {
+  try {
+    const { error } = await adminClient()
+      .from("audit_log")
+      .insert({
+        actor_id: actorId,
+        actor_email: actorEmail,
+        action,
+        target_type: options.targetType ?? null,
+        target_id: options.targetId ?? null,
+        payload: (options.payload ?? null) as never,
+      })
+    if (error) console.error("logAudit failed:", error.message, { action })
+  } catch (e) {
+    console.error("logAudit threw:", e, { action })
+  }
+}
+
+export type AuditFilters = {
+  page?: number
+  pageSize?: number
+  action?: AuditActionName | "all"
+  targetType?: AuditTargetType | "all"
+  actorId?: string
+  /** Filter to entries within the last N hours, or "all" for no time filter. */
+  withinHours?: number | "all"
+}
+
+export async function getAuditLog(filters: AuditFilters = {}) {
+  const page = Math.max(1, filters.page ?? 1)
+  const pageSize = filters.pageSize ?? 50
+  const from = (page - 1) * pageSize
+
+  let query = adminClient()
+    .from("audit_log")
+    .select("*", { count: "exact" })
+    .order("created_at", { ascending: false })
+    .range(from, from + pageSize - 1)
+
+  if (filters.action && filters.action !== "all") {
+    query = query.eq("action", filters.action)
+  }
+  if (filters.targetType && filters.targetType !== "all") {
+    query = query.eq("target_type", filters.targetType)
+  }
+  if (filters.actorId) {
+    query = query.eq("actor_id", filters.actorId)
+  }
+  if (filters.withinHours && filters.withinHours !== "all") {
+    const cutoff = new Date(Date.now() - filters.withinHours * 60 * 60 * 1000).toISOString()
+    query = query.gte("created_at", cutoff)
+  }
+
+  return query
+}
