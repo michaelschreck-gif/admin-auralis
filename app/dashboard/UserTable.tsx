@@ -1,5 +1,6 @@
 "use client"
 
+import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useTransition, useState, useEffect } from "react"
 import type { Profile, PlanType, StatusFilter, LanguageType } from "@/lib/supabase/admin"
@@ -233,10 +234,18 @@ export default function UserTable({
                       <div className="w-8 h-8 rounded-full bg-blue-50 border border-blue-100 flex items-center justify-center flex-shrink-0">
                         <span className="text-xs font-semibold text-[#4F6EF7]">{initials}</span>
                       </div>
-                      <div>
-                        <p className="font-medium text-[#0f172a]">{user.full_name ?? "—"}</p>
-                        <p className="text-xs text-[#64748b]">{user.email}</p>
-                      </div>
+                      <Link
+                        href={`/dashboard/users/${user.id}`}
+                        className="group"
+                        title="Detail-Ansicht öffnen"
+                      >
+                        <p className="font-medium text-[#0f172a] group-hover:text-[#4F6EF7] transition-colors">
+                          {user.full_name ?? "—"}
+                        </p>
+                        <p className="text-xs text-[#64748b] group-hover:text-[#4F6EF7] transition-colors">
+                          {user.email}
+                        </p>
+                      </Link>
                       {user.is_admin && (
                         <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-[#64748b] font-medium">
                           Admin
