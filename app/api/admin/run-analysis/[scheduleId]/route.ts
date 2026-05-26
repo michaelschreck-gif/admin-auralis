@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server"
 import { createClient } from "@/lib/supabase/server"
-import { getAdminClient, getScheduleById } from "@/lib/supabase/admin"
+import { getAdminClient, getScheduleById, logAudit } from "@/lib/supabase/admin"
 import { runAnalysisForSchedule } from "@/lib/auralis/runner"
 
 // Anthropic fan-out can take 20–40s; give it some headroom on Vercel Hobby.
@@ -31,7 +31,7 @@ export async function POST(
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("is_admin")
+    .select("is_admin, email")
     .eq("id", user.id)
     .single()
 
@@ -54,6 +54,19 @@ export async function POST(
     const result = await runAnalysisForSchedule(scheduleId, getAdminClient(), {
       trigger: "manual",
       advanceNextRunAt: false, // manual runs must NOT touch the cron schedule
+    })
+    await logAudit(user.id, profile.email, "schedule.analyze.manual", {
+      targetType: "schedule",
+      targetId: scheduleId,
+      payload: {
+        report_id: result.reportId,
+        score: result.score,
+        sentiment: result.sentiment,
+        mention_rate: result.mentionRate,
+        query_count: result.queryCount,
+        schedule_name: schedule.name,
+        profile_id: schedule.profile_id,
+      },
     })
     return NextResponse.json({
       success: true,

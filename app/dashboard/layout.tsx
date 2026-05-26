@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { actionSignOut } from "./actions"
-import { NavLink, UsersIcon, StatsIcon, HeaderTitle } from "./NavLink"
+import { NavLink, UsersIcon, StatsIcon, AuditIcon, HeaderTitle } from "./NavLink"
 import type { ReactNode } from "react"
 
 export const dynamic = "force-dynamic"
@@ -55,6 +55,9 @@ export default async function AdminLayout({ children }: { children: ReactNode })
           </NavLink>
           <NavLink href="/dashboard/stats" icon={<StatsIcon />}>
             Statistiken
+          </NavLink>
+          <NavLink href="/dashboard/audit" icon={<AuditIcon />}>
+            Audit-Log
           </NavLink>
         </nav>
 

@@ -9,6 +9,7 @@ import {
   inviteUser,
   countAdmins,
   updateSchedule,
+  logAudit,
   type PlanType,
   type LanguageType,
   type FrequencyType,
@@ -17,26 +18,33 @@ import { createClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
 
-/** Returns the current admin's user ID or redirects to /login. */
-async function requireAdmin(): Promise<string> {
+type ActorContext = { id: string; email: string | null }
+
+/** Returns the current admin's identity or redirects to /login. */
+async function requireAdmin(): Promise<ActorContext> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect("/login")
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("is_admin")
+    .select("is_admin, email")
     .eq("id", user.id)
     .single()
 
   if (!profile?.is_admin) redirect("/login")
-  return user.id
+  return { id: user.id, email: profile.email ?? user.email ?? null }
 }
 
 export async function actionUpdatePlan(userId: string, plan: PlanType) {
-  await requireAdmin()
+  const actor = await requireAdmin()
   const { error } = await updateUserPlan(userId, plan)
   if (error) throw new Error(error.message)
+  await logAudit(actor.id, actor.email, "user.plan.update", {
+    targetType: "user",
+    targetId: userId,
+    payload: { plan },
+  })
   revalidatePath("/dashboard")
 }
 
@@ -48,10 +56,10 @@ export async function actionUpdateProfile(
     is_admin?: boolean
   },
 ) {
-  const actorId = await requireAdmin()
+  const actor = await requireAdmin()
 
   // Self-demotion guard: an admin cannot remove their own admin flag
-  if (patch.is_admin === false && userId === actorId) {
+  if (patch.is_admin === false && userId === actor.id) {
     throw new Error("Du kannst dir nicht selbst die Admin-Rechte entziehen.")
   }
 
@@ -65,33 +73,53 @@ export async function actionUpdateProfile(
 
   const { error } = await updateUserProfile(userId, patch)
   if (error) throw new Error(error.message)
+  await logAudit(actor.id, actor.email, "user.profile.update", {
+    targetType: "user",
+    targetId: userId,
+    payload: patch as Record<string, unknown>,
+  })
   revalidatePath("/dashboard")
+  revalidatePath(`/dashboard/users/${userId}`)
 }
 
 export async function actionBanUser(userId: string) {
-  const actorId = await requireAdmin()
-  if (userId === actorId) {
+  const actor = await requireAdmin()
+  if (userId === actor.id) {
     throw new Error("Du kannst dich nicht selbst sperren.")
   }
   const { error } = await banUser(userId)
   if (error) throw new Error(error.message)
+  await logAudit(actor.id, actor.email, "user.ban", {
+    targetType: "user",
+    targetId: userId,
+  })
   revalidatePath("/dashboard")
+  revalidatePath(`/dashboard/users/${userId}`)
 }
 
 export async function actionUnbanUser(userId: string) {
-  await requireAdmin()
+  const actor = await requireAdmin()
   const { error } = await unbanUser(userId)
   if (error) throw new Error(error.message)
+  await logAudit(actor.id, actor.email, "user.unban", {
+    targetType: "user",
+    targetId: userId,
+  })
   revalidatePath("/dashboard")
+  revalidatePath(`/dashboard/users/${userId}`)
 }
 
 export async function actionDeleteUser(userId: string) {
-  const actorId = await requireAdmin()
-  if (userId === actorId) {
+  const actor = await requireAdmin()
+  if (userId === actor.id) {
     throw new Error("Du kannst dich nicht selbst löschen.")
   }
   const { error } = await deleteUser(userId)
   if (error) throw new Error(error.message)
+  await logAudit(actor.id, actor.email, "user.delete", {
+    targetType: "user",
+    targetId: userId,
+  })
   revalidatePath("/dashboard")
 }
 
@@ -102,21 +130,24 @@ export async function actionDeleteUser(userId: string) {
  * creates the `profiles` row.
  */
 export async function actionInviteUser(email: string) {
-  await requireAdmin()
+  const actor = await requireAdmin()
   const trimmed = email.trim().toLowerCase()
   if (!trimmed) throw new Error("E-Mail darf nicht leer sein.")
-  // Naive email check; Supabase will reject invalid ones anyway.
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
     throw new Error("Ungültige E-Mail-Adresse.")
   }
 
-  // Redirect users to the main app after they accept the invite, not the admin panel.
   const redirectTo = process.env.NEXT_PUBLIC_MAIN_APP_URL
     ? `${process.env.NEXT_PUBLIC_MAIN_APP_URL}/auth/callback`
     : undefined
 
-  const { error } = await inviteUser(trimmed, redirectTo)
+  const { data, error } = await inviteUser(trimmed, redirectTo)
   if (error) throw new Error(error.message)
+  await logAudit(actor.id, actor.email, "user.invite", {
+    targetType: "user",
+    targetId: data?.user?.id ?? undefined,
+    payload: { email: trimmed },
+  })
   revalidatePath("/dashboard")
 }
 
@@ -135,9 +166,14 @@ export async function actionUpdateScheduleFrequency(
   frequency: FrequencyType,
   profileId: string,
 ) {
-  await requireAdmin()
+  const actor = await requireAdmin()
   const { error } = await updateSchedule(scheduleId, { frequency })
   if (error) throw new Error(error.message)
+  await logAudit(actor.id, actor.email, "schedule.frequency.update", {
+    targetType: "schedule",
+    targetId: scheduleId,
+    payload: { frequency, profile_id: profileId },
+  })
   revalidatePath(`/dashboard/users/${profileId}`)
 }
 
@@ -146,11 +182,16 @@ export async function actionToggleSchedule(
   isActive: boolean,
   profileId: string,
 ) {
-  await requireAdmin()
+  const actor = await requireAdmin()
   // Re-activating? Set next_run_at to now so the next cron pass picks it up.
   const patch: Parameters<typeof updateSchedule>[1] = { is_active: isActive }
   if (isActive) patch.next_run_at = new Date().toISOString()
   const { error } = await updateSchedule(scheduleId, patch)
   if (error) throw new Error(error.message)
+  await logAudit(actor.id, actor.email, "schedule.toggle", {
+    targetType: "schedule",
+    targetId: scheduleId,
+    payload: { is_active: isActive, profile_id: profileId },
+  })
   revalidatePath(`/dashboard/users/${profileId}`)
 }
