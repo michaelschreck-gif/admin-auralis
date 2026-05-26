@@ -1,36 +1,102 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Auralis Admin Panel
 
-## Getting Started
+Administrationsoberfläche für [Auralis](https://github.com/michaelschreck-gif/auralis) – das KI-Visibility-Monitoring-Tool.
 
-First, run the development server:
+Live: [admin-auralis.vercel.app](https://admin-auralis.vercel.app)
+
+---
+
+## Was ist drin?
+
+- **Nutzerverwaltung** mit Liste, Suche, Filter (Status + Tarif), Plan-Edit, Profil-Edit, Einladen per Magic-Link, Sperren/Entsperren, Hard-Delete
+- **User-Detail-Seite** pro Profil mit Topics (Monitoring-Schedules), letzten 25 Reports, Topic-Editing und **manueller Analyse-Trigger** über die Anthropic-API
+- **Stats-Dashboard** mit KPIs, Tarif-Verteilung, 7-Tage-Reports-Chart und Cron-Health
+- **Audit-Log** – unveränderbares Protokoll aller Admin-Aktionen mit Filter und Payload-Viewer
+- Self-Protection: Admin kann sich nicht selbst sperren, löschen oder Admin-Rechte entziehen; mindestens ein Admin muss im System bleiben
+
+## Tech-Stack
+
+- **Next.js 16.2.6** (App Router, Turbopack) – `proxy.ts` statt klassischer `middleware.ts`
+- **React 19.2.4** + **Tailwind v4**
+- **Supabase** (`@supabase/ssr` für SSR-Auth, `@supabase/supabase-js` mit Service-Role für Admin-Operationen)
+- **Anthropic SDK** für manuelle Analyse-Trigger (Modell `claude-sonnet-4-5`)
+- Geteiltes Datenbank-Schema mit dem Haupt-Tool, eigene Migration für `audit_log` (siehe `auralis/supabase/migrations/`)
+
+## Auth-Modell
+
+Drei Schichten:
+
+1. **`proxy.ts`** prüft die Supabase-Session und redirected nicht-eingeloggte User von `/dashboard/*` auf `/login`.
+2. **`app/dashboard/layout.tsx`** liest das `profiles`-Row für den User und prüft `is_admin = true`. Wenn nicht → redirect `/login`.
+3. **Server Actions + API Routes** rufen alle `requireAdmin()` als Defense-in-Depth, bevor sie irgendwas in die DB schreiben.
+
+Service-Role-Operationen laufen ausschließlich serverseitig in `lib/supabase/admin.ts` (lazy-init).
+
+## Required Env-Vars
+
+| Variable | Wozu | Pflicht? |
+|---|---|---|
+| `NEXT_PUBLIC_SUPABASE_URL` | Supabase-Projekt-URL | ✅ |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Anon (Public) Key | ✅ |
+| `SUPABASE_SERVICE_ROLE_KEY` | Service-Role-Key (umgeht RLS) | ✅ |
+| `ANTHROPIC_API_KEY` | Für `/api/admin/run-analysis/[scheduleId]` | ✅ (für manuelle Analyse) |
+| `NEXT_PUBLIC_MAIN_APP_URL` | Redirect-Ziel für Invite-Magic-Links | empfohlen |
+
+Alle drei Supabase-Vars **müssen für Production UND Preview** in Vercel gesetzt sein, sonst crashen Preview-Deployments mit „supabaseUrl is required".
+
+## Setup lokal
 
 ```bash
+git clone https://github.com/michaelschreck-gif/admin-auralis.git
+cd admin-auralis
+npm install
+
+# .env.local mit den oben genannten Vars anlegen
+# Werte aus Supabase Dashboard → Settings → API Keys (Legacy-Tab für anon/service_role)
+
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+# → http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Deployment
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- Vercel-Projekt: `auralis-projects1/admin-auralis`
+- Auto-deploy bei push auf `main`
+- Custom-Domain: aktuell `admin-auralis.vercel.app`
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Routen
 
-## Learn More
+| Pfad | Beschreibung |
+|---|---|
+| `/login` | E-Mail + Passwort Login mit `is_admin`-Check |
+| `/auth/callback` | OAuth/Magic-Link Callback |
+| `/dashboard` | User-Verwaltung |
+| `/dashboard/users/[id]` | User-Detail mit Topics + Reports |
+| `/dashboard/stats` | Statistiken & Cron-Health |
+| `/dashboard/audit` | Audit-Log mit Filter |
+| `/api/admin/run-analysis/[scheduleId]` | POST – manueller Analyse-Trigger (60s maxDuration) |
+| `/api/admin/report/[id]/query-results` | GET – Query-Results für Report-Drawer |
 
-To learn more about Next.js, take a look at the following resources:
+## Audit-Log
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Geschrieben durch `logAudit()` in `lib/supabase/admin.ts`, gelesen über RLS-Policy `audit_log: admin read`. Schreiben geht nur über Service-Role (kein INSERT/UPDATE/DELETE für authenticated User → unveränderbarer Trail).
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Erfasste Aktionen:
 
-## Deploy on Vercel
+- `user.invite`, `user.plan.update`, `user.profile.update`
+- `user.ban`, `user.unban`, `user.delete`
+- `schedule.frequency.update`, `schedule.toggle`
+- `schedule.analyze.manual`
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Wartung
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- DB-Typen regenerieren nach Schema-Änderungen: Supabase-CLI `supabase gen types typescript` oder via Supabase MCP-Tool
+- `lib/auralis/queries.ts` und `analyzer.ts` sind **Kopien** aus dem Haupt-Repo – bei Änderungen dort hier auch nachziehen (siehe Drift-Note in `lib/auralis/runner.ts`)
+
+## Roadmap
+
+Siehe `admin-auralis-ROADMAP.md` im übergeordneten Workspace.
+
+---
+
+Built with Claude in 5 Sprints (Mai 2026).

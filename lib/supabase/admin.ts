@@ -217,8 +217,10 @@ export type StatsSnapshot = {
     total: number
     active: number
     overdueCount: number
-    /** ISO timestamp of the most recent successful run across all schedules, or null. */
-    lastRunAt: string | null
+    /** ISO timestamp of the most recent run of ANY kind (cron OR manual). */
+    lastActivityAt: string | null
+    /** ISO timestamp of the most recent CRON-triggered visibility report. */
+    lastScheduledRunAt: string | null
   }
   reports: {
     total: number
@@ -269,17 +271,26 @@ export async function getStats(): Promise<StatsSnapshot> {
   }, { free: 0, starter: 0, pro: 0, enterprise: 0 })
 
   // ── Schedules ───────────────────────────────────────────────────────
-  const [totalSchedules, activeSchedules, lastRunRow] = await Promise.all([
+  const [totalSchedules, activeSchedules, lastActivityRow, lastScheduledRow] = await Promise.all([
     client.from("monitoring_schedules").select("id", { count: "exact", head: true }),
     client
       .from("monitoring_schedules")
       .select("id", { count: "exact", head: true })
       .eq("is_active", true),
+    // Last activity of any kind (cron OR manual): max(last_run_at) on schedules
     client
       .from("monitoring_schedules")
       .select("last_run_at")
       .not("last_run_at", "is", null)
       .order("last_run_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    // Last scheduled cron run: latest visibility_report with trigger='scheduled'
+    client
+      .from("visibility_reports")
+      .select("created_at")
+      .eq("trigger", "scheduled")
+      .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle(),
   ])
@@ -328,7 +339,8 @@ export async function getStats(): Promise<StatsSnapshot> {
       total: totalSchedules.count ?? 0,
       active: activeSchedules.count ?? 0,
       overdueCount: overdueRes.count ?? 0,
-      lastRunAt: lastRunRow.data?.last_run_at ?? null,
+      lastActivityAt: lastActivityRow.data?.last_run_at ?? null,
+      lastScheduledRunAt: lastScheduledRow.data?.created_at ?? null,
     },
     reports: {
       total: totalReports.count ?? 0,
