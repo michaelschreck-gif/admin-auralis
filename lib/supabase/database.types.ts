@@ -47,10 +47,62 @@ export type Database = {
         }
         Relationships: []
       }
+      competitor_reports: {
+        Row: {
+          id: string
+          competitor_id: string
+          profile_id: string
+          trigger: Database["public"]["Enums"]["trigger_type"]
+          visibility_score: number | null
+          sentiment: Database["public"]["Enums"]["sentiment_type"] | null
+          summary: string | null
+          raw_data: Json | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          competitor_id: string
+          profile_id: string
+          trigger?: Database["public"]["Enums"]["trigger_type"]
+          visibility_score?: number | null
+          sentiment?: Database["public"]["Enums"]["sentiment_type"] | null
+          summary?: string | null
+          raw_data?: Json | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          competitor_id?: string
+          profile_id?: string
+          trigger?: Database["public"]["Enums"]["trigger_type"]
+          visibility_score?: number | null
+          sentiment?: Database["public"]["Enums"]["sentiment_type"] | null
+          summary?: string | null
+          raw_data?: Json | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "competitor_reports_competitor_id_fkey"
+            columns: ["competitor_id"]
+            isOneToOne: false
+            referencedRelation: "competitors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "competitor_reports_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       competitors: {
         Row: {
           created_at: string
           id: string
+          language: Database["public"]["Enums"]["language_type"]
           last_analyzed_at: string | null
           last_score: number | null
           name: string
@@ -60,6 +112,7 @@ export type Database = {
         Insert: {
           created_at?: string
           id?: string
+          language?: Database["public"]["Enums"]["language_type"]
           last_analyzed_at?: string | null
           last_score?: number | null
           name: string
@@ -69,6 +122,7 @@ export type Database = {
         Update: {
           created_at?: string
           id?: string
+          language?: Database["public"]["Enums"]["language_type"]
           last_analyzed_at?: string | null
           last_score?: number | null
           name?: string
