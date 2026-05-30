@@ -18,6 +18,7 @@ import { generateVisibilityQueries, type QueryConfig } from "./queries"
 import {
   extractMentionSignal,
   buildVisibilityReport,
+  sanitizeTargetName,
   type QueryResult,
   type VisibilityReport,
 } from "./analyzer"
@@ -213,10 +214,17 @@ export async function runAnalysisForSchedule(
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("plan")
+    .select("plan, full_name")
     .eq("id", schedule.profile_id)
     .single()
   const plan = (profile?.plan ?? "free") as PlanType
+
+  // WICHTIG: Such-Target ist der PROFILNAME, nicht schedule.name (der enthält
+  // oft einen Themen-Suffix „Person — Thema" → falsche 100/100). Fallback:
+  // bereinigter schedule.name.
+  const targetName =
+    (profile?.full_name && profile.full_name.trim()) ||
+    sanitizeTargetName(schedule.name)
 
   // 2. Pick providers (plan-gated, env-var-gated)
   const providers = options.providerOverride ?? providersForPlan(plan)
@@ -226,7 +234,7 @@ export async function runAnalysisForSchedule(
 
   // 3. Generate the standard 7 queries
   const config: QueryConfig = {
-    name: schedule.name,
+    name: targetName,
     topics: [schedule.query],
     language: schedule.language === "en" ? "en" : "de",
   }
@@ -235,10 +243,10 @@ export async function runAnalysisForSchedule(
   // 4. Fan-out per provider, in parallel
   const providerOutcomes = await Promise.all(
     providers.map(async (provider) => {
-      const { queryResults, error } = await runProvider(provider, queries, schedule.name)
+      const { queryResults, error } = await runProvider(provider, queries, targetName)
       const report = error
         ? null
-        : buildVisibilityReport(schedule.name, [schedule.query], queryResults)
+        : buildVisibilityReport(targetName, [schedule.query], queryResults)
       return { provider, queryResults, report, error }
     }),
   )
@@ -279,7 +287,7 @@ export async function runAnalysisForSchedule(
   // 6. Aggregate across successful providers (mean of per-model scores)
   const allQueryResults = providerOutcomes.flatMap(o => o.queryResults)
   const aggregateReport = aggregateReports(
-    schedule.name,
+    targetName,
     [schedule.query],
     successfulProviders.map(o => o.report!),
     allQueryResults,

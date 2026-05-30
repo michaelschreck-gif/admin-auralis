@@ -39,6 +39,30 @@ export interface VisibilityReport {
   }
 }
 
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+}
+
+/**
+ * Bereinigt einen Such-Namen: entfernt Themen-Suffixe (alles nach —, –, ·, |,
+ * oder " - ") und Flaggen-Emojis. So wird aus „Maud Schock — Personal Branding"
+ * wieder „Maud Schock".
+ */
+export function sanitizeTargetName(raw: string): string {
+  let n = (raw ?? "").split(/[—–·|]/)[0]
+  n = n.replace(/\s+-\s+.*$/, "")
+  n = n.replace(/[\u{1F1E6}-\u{1F1FF}]/gu, "")
+  return n.trim()
+}
+
+/** Findet `needle` (lower-case) als ganzes Wort in `haystack` (lower-case), sonst -1. */
+function findWholeWord(haystackLower: string, needleLower: string): number {
+  if (!needleLower) return -1
+  const re = new RegExp(`(?<![\\p{L}\\p{N}])${escapeRegExp(needleLower)}(?![\\p{L}\\p{N}])`, "u")
+  const m = re.exec(haystackLower)
+  return m ? m.index : -1
+}
+
 /**
  * Parses a single AI response to extract mention signals for a target person.
  * Uses simple but robust string matching — no AI needed for this step.
@@ -52,16 +76,25 @@ export function extractMentionSignal(
   queryType: string
 ): QueryResult {
   const lowerResponse = response.toLowerCase()
-  const lowerName = personName.toLowerCase()
+
+  // Themen-Suffix entfernen (Defense-in-Depth, falls ein Schedule-Name wie
+  // „Person — Thema" durchgereicht wird).
+  const cleanName = sanitizeTargetName(personName)
+  const lowerName = cleanName.toLowerCase()
 
   // Split name into parts for partial matching (first name, last name)
-  const nameParts = personName.trim().split(/\s+/)
-  const lastName = nameParts[nameParts.length - 1].toLowerCase()
-  const firstName = nameParts[0].toLowerCase()
+  const nameParts = cleanName.split(/\s+/).filter(Boolean)
+  const lastName = (nameParts[nameParts.length - 1] ?? "").toLowerCase()
 
-  // Check for full name match first, then last name
-  const fullNameIndex = lowerResponse.indexOf(lowerName)
-  const lastNameIndex = lowerResponse.indexOf(lastName)
+  // Vollnamen als ganzes Wort suchen.
+  const fullNameIndex = lowerName ? findWholeWord(lowerResponse, lowerName) : -1
+
+  // Nachnamen-Fallback NUR bei echtem Vor+Nachnamen (>= 2 Teile) und
+  // distinktivem Nachnamen (>= 3 Zeichen) — so kann ein generisches Themenwort
+  // („Branding") nie als Nachname zünden.
+  const lastNameEligible = nameParts.length >= 2 && lastName.length >= 3
+  const lastNameIndex = lastNameEligible ? findWholeWord(lowerResponse, lastName) : -1
+
   const mentioned = fullNameIndex !== -1 || lastNameIndex !== -1
   const matchIndex = fullNameIndex !== -1 ? fullNameIndex : lastNameIndex
 
