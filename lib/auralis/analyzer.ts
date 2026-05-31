@@ -277,3 +277,89 @@ export function buildVisibilityReport(
     },
   }
 }
+
+// ─── Laufzeit-Invarianten (Plausibilitäts-Check) ──────────────────────────────
+// Portiert aus dem Haupt-Repo (auralis). Fängt unplausible Reports ab — z.B. den
+// „Maud Schock"-Bug (100/100 ohne Namensbeleg). Drift-Risiko: bei Änderung im
+// Haupt-Repo hier nachziehen.
+
+export type IntegrityViolation = {
+  code:
+    | "MENTION_WITHOUT_NAME"
+    | "PERFECT_SCORE_NO_EVIDENCE"
+    | "MENTIONRATE_PRESENCE_MISMATCH"
+    | "SCORE_OUT_OF_RANGE"
+  message: string
+  queryId?: string
+}
+
+export type IntegrityResult = {
+  ok: boolean
+  violations: IntegrityViolation[]
+}
+
+/** Prüft einen fertigen VisibilityReport auf Plausibilität. */
+export function validateReportIntegrity(
+  report: VisibilityReport,
+  targetName: string,
+): IntegrityResult {
+  const violations: IntegrityViolation[] = []
+  const clean = sanitizeTargetName(targetName)
+  const parts = clean.split(/\s+/).filter(Boolean)
+  const lastName = (parts[parts.length - 1] ?? "").toLowerCase()
+  const lastNameEligible = parts.length >= 2 && lastName.length >= 3
+  const fullLower = clean.toLowerCase()
+
+  const nameInText = (text: string): boolean => {
+    const t = (text ?? "").toLowerCase()
+    if (fullLower && findWholeWord(t, fullLower) !== -1) return true
+    if (lastNameEligible && findWholeWord(t, lastName) !== -1) return true
+    return false
+  }
+
+  const sb = report.scoreBreakdown
+  const ranged: [string, number][] = [
+    ["overallScore", report.overallScore],
+    ["mentionRate", report.mentionRate],
+    ["presenceScore", sb.presenceScore],
+    ["positionScore", sb.positionScore],
+    ["contextScore", sb.contextScore],
+    ["topicAlignmentScore", sb.topicAlignmentScore],
+  ]
+  for (const [label, v] of ranged) {
+    if (!Number.isFinite(v) || v < 0 || v > 100) {
+      violations.push({ code: "SCORE_OUT_OF_RANGE", message: `${label}=${v} liegt außerhalb 0–100` })
+    }
+  }
+
+  let evidencedMentions = 0
+  for (const qr of report.queryResults ?? []) {
+    if (qr.signal?.mentioned) {
+      if (nameInText(qr.rawResponse)) {
+        evidencedMentions++
+      } else {
+        violations.push({
+          code: "MENTION_WITHOUT_NAME",
+          message: `Query ${qr.queryId}: als „erwähnt" markiert, aber „${clean}" kommt im Antworttext nicht vor`,
+          queryId: qr.queryId,
+        })
+      }
+    }
+  }
+
+  if ((report.mentionRate > 0) !== (sb.presenceScore > 0)) {
+    violations.push({
+      code: "MENTIONRATE_PRESENCE_MISMATCH",
+      message: `mentionRate=${report.mentionRate} aber presenceScore=${sb.presenceScore} — inkonsistent`,
+    })
+  }
+
+  if (report.overallScore >= 90 && evidencedMentions === 0) {
+    violations.push({
+      code: "PERFECT_SCORE_NO_EVIDENCE",
+      message: `overallScore=${report.overallScore}, aber kein einziger Treffer enthält „${clean}" im Antworttext`,
+    })
+  }
+
+  return { ok: violations.length === 0, violations }
+}

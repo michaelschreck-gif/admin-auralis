@@ -472,3 +472,75 @@ export async function getAuditLog(filters: AuditFilters = {}) {
 
   return query
 }
+
+/* ─────────────────────────────────────────────────────────
+ * Integritaets-Scan: prueft gespeicherte Self-Reports gegen
+ * validateReportIntegrity (Plausibilitaet: Treffer mit Namensbeleg,
+ * Scores im gueltigen Bereich). Macht stille Fehler wie den
+ * "Maud Schock"-Bug (100/100 ohne Beleg) im Admin sichtbar.
+ * Wettbewerber-Reports werden bereits zur Schreibzeit im Haupt-Tool
+ * durch dieselbe Invariante geprueft.
+ * ───────────────────────────────────────────────────────── */
+
+export type IntegrityFlag = {
+  kind: "self" | "competitor"
+  name: string
+  reportId: string
+  date: string
+  score: number | null
+  codes: string[]
+  violationCount: number
+}
+
+export type IntegrityScan = {
+  scannedCount: number
+  flagged: IntegrityFlag[]
+}
+
+export async function getIntegrityScan(limit = 100): Promise<IntegrityScan> {
+  const sb = adminClient()
+  const { validateReportIntegrity } = await import("@/lib/auralis/analyzer")
+  type Report = import("@/lib/auralis/analyzer").VisibilityReport
+
+  const asReport = (raw: unknown): Report | null => {
+    const r = raw as Report | null
+    if (!r || typeof r !== "object" || !r.scoreBreakdown) return null
+    return r
+  }
+
+  const [reportRows, profileRows] = await Promise.all([
+    sb
+      .from("visibility_reports")
+      .select("id, profile_id, visibility_score, created_at, raw_data")
+      .order("created_at", { ascending: false })
+      .limit(limit),
+    sb.from("profiles").select("id, full_name"),
+  ])
+
+  const nameById = new Map<string, string>()
+  ;(profileRows.data ?? []).forEach((p) => nameById.set(p.id, p.full_name ?? ""))
+
+  const flagged: IntegrityFlag[] = []
+  let scannedCount = 0
+
+  for (const row of reportRows.data ?? []) {
+    const report = asReport(row.raw_data)
+    if (!report) continue
+    scannedCount++
+    const target = nameById.get(row.profile_id) || report.personName || ""
+    const res = validateReportIntegrity(report, target)
+    if (!res.ok) {
+      flagged.push({
+        kind: "self",
+        name: target || "(unbekannt)",
+        reportId: row.id,
+        date: row.created_at,
+        score: row.visibility_score !== null ? Math.round(Number(row.visibility_score)) : null,
+        codes: Array.from(new Set(res.violations.map((v) => v.code))),
+        violationCount: res.violations.length,
+      })
+    }
+  }
+
+  return { scannedCount, flagged }
+}
