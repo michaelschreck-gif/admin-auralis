@@ -44,34 +44,31 @@ export default function AdminLoginPage() {
   }
 
   const inputCls =
-    "w-full bg-white border border-gray-200 rounded-lg px-4 py-2.5 text-sm text-[#0f172a] placeholder-[#94a3b8] focus:outline-none focus:border-[#4F6EF7] focus:ring-1 focus:ring-[#4F6EF7]/20 transition-colors"
+    "w-full bg-white border border-[var(--border-subtle)] rounded-lg px-4 py-2.5 text-sm text-[var(--foreground)] placeholder-[var(--text-faint)] focus:outline-none focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent)]/20 transition-colors"
 
   return (
-    <div className="min-h-screen bg-[#f8f9fb] flex items-center justify-center p-6">
+    <div className="min-h-screen bg-[var(--surface-muted)] flex items-center justify-center p-6">
       <div className="max-w-sm w-full">
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8 space-y-6">
+        <div className="bg-white rounded-2xl border border-[var(--border-subtle)] shadow-sm p-8 space-y-6">
 
           {/* Branding */}
           <div className="text-center space-y-2">
-            <div className="flex items-center justify-center gap-2.5">
-              <div className="w-8 h-8 rounded-lg bg-[#0f172a] flex items-center justify-center">
-                <span className="text-white text-sm font-bold">A</span>
-              </div>
-              <span className="text-[#0f172a] font-semibold text-lg tracking-tight">Auralis</span>
+            <div className="flex items-center justify-center">
+              <img src="/brand/combinationmark-black.svg" alt="DigitalHalo" className="h-7 w-auto" />
             </div>
-            <p className="text-xs text-[#64748b] font-medium bg-gray-100 inline-block px-3 py-1 rounded-full">
+            <p className="text-xs text-[var(--text-muted)] font-medium bg-[var(--surface-sunken)] inline-block px-3 py-1 rounded-full">
               Admin Panel
             </p>
             <div className="pt-2">
-              <h1 className="text-xl font-semibold text-[#0f172a]">Admin-Login</h1>
-              <p className="text-[#64748b] text-sm mt-1">Nur für autorisierte Administratoren</p>
+              <h1 className="text-xl font-semibold text-[var(--foreground)]">Admin-Login</h1>
+              <p className="text-[var(--text-muted)] text-sm mt-1">Nur für autorisierte Administratoren</p>
             </div>
           </div>
 
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-1.5">
-              <label className="text-xs text-[#64748b] font-medium uppercase tracking-wider">
+              <label className="text-xs text-[var(--text-muted)] font-medium uppercase tracking-wider">
                 E-Mail
               </label>
               <input
@@ -85,7 +82,7 @@ export default function AdminLoginPage() {
               />
             </div>
             <div className="space-y-1.5">
-              <label className="text-xs text-[#64748b] font-medium uppercase tracking-wider">
+              <label className="text-xs text-[var(--text-muted)] font-medium uppercase tracking-wider">
                 Passwort
               </label>
               <input
@@ -99,19 +96,19 @@ export default function AdminLoginPage() {
             </div>
 
             {error && (
-              <div className="rounded-lg bg-red-50 border border-red-100 px-4 py-3">
-                <p className="text-xs text-red-600 font-medium">{error}</p>
+              <div className="rounded-lg bg-[var(--danger-soft)] border border-[var(--danger)]/20 px-4 py-3">
+                <p className="text-xs text-[var(--danger)] font-medium">{error}</p>
               </div>
             )}
 
             <button
               type="submit"
               disabled={loading || !email.trim() || !password.trim()}
-              className="w-full py-2.5 rounded-lg text-sm font-medium bg-[#0f172a] hover:bg-gray-800 text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              className="w-full py-2.5 rounded-lg text-sm font-medium bg-[var(--foreground)] hover:bg-[var(--accent-strong)] text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             >
               {loading ? (
                 <span className="flex items-center justify-center gap-2">
-                  <span className="w-3.5 h-3.5 border border-gray-600 border-t-white rounded-full animate-spin" />
+                  <span className="w-3.5 h-3.5 border border-[var(--text-faint)] border-t-white rounded-full animate-spin" />
                   Anmelden…
                 </span>
               ) : (
@@ -120,7 +117,7 @@ export default function AdminLoginPage() {
             </button>
           </form>
 
-          <p className="text-xs text-[#94a3b8] text-center">
+          <p className="text-xs text-[var(--text-faint)] text-center">
             Noch kein Passwort? Setze es im Supabase Dashboard unter Authentication → Users.
           </p>
         </div>

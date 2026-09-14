@@ -34,13 +34,13 @@ export default async function StatsPage() {
 
   if (loadError) {
     return (
-      <div className="rounded-lg bg-red-50 border border-red-100 px-4 py-3">
-        <p className="text-xs text-red-600 font-medium">{loadError}</p>
+      <div className="rounded-lg bg-[var(--danger-soft)] border border-[var(--danger)]/20 px-4 py-3">
+        <p className="text-xs text-[var(--danger)] font-medium">{loadError}</p>
       </div>
     )
   }
   if (!stats) {
-    return <p className="text-sm text-[#64748b]">Lade Statistiken…</p>
+    return <p className="text-sm text-[var(--text-muted)]">Lade Statistiken…</p>
   }
 
   const totalUsers = stats.users.total
@@ -49,8 +49,8 @@ export default async function StatsPage() {
   return (
     <div className="space-y-6">
       <header>
-        <h1 className="text-base font-semibold text-[#0f172a]">Statistiken</h1>
-        <p className="text-xs text-[#64748b] mt-0.5">
+        <h1 className="text-base font-semibold text-[var(--foreground)]">Statistiken</h1>
+        <p className="text-xs text-[var(--text-muted)] mt-0.5">
           Live-Snapshot · zuletzt aktualisiert {new Date().toLocaleString("de-DE", { dateStyle: "short", timeStyle: "short" })}
         </p>
       </header>
@@ -64,11 +64,11 @@ export default async function StatsPage() {
       </div>
 
       {/* ───────── Score-Integrität ───────── */}
-      <section className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
+      <section className="bg-white rounded-xl border border-[var(--border-subtle)] shadow-sm p-6">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <h2 className="text-sm font-semibold text-[#0f172a]">Score-Integrität</h2>
-            <p className="text-xs text-[#64748b] mt-0.5">
+            <h2 className="text-sm font-semibold text-[var(--foreground)]">Score-Integrität</h2>
+            <p className="text-xs text-[var(--text-muted)] mt-0.5">
               Automatische Plausibilitätsprüfung der letzten {integrity.scannedCount} Reports (validateReportIntegrity)
             </p>
           </div>
@@ -77,14 +77,14 @@ export default async function StatsPage() {
               ✓ keine Auffälligkeiten
             </span>
           ) : (
-            <span className="text-xs px-2.5 py-1 rounded-full bg-red-50 text-red-700 border border-red-100 font-medium whitespace-nowrap">
+            <span className="text-xs px-2.5 py-1 rounded-full bg-[var(--danger-soft)] text-[var(--danger)] border border-[var(--danger)]/20 font-medium whitespace-nowrap">
               {integrity.flagged.length} auffällig
             </span>
           )}
         </div>
 
         {integrity.flagged.length === 0 ? (
-          <p className="text-sm text-[#64748b] mt-4">
+          <p className="text-sm text-[var(--text-muted)] mt-4">
             Alle geprüften Reports sind plausibel: markierte Treffer enthalten den Namen im Antworttext,
             Scores liegen im gültigen Bereich.
           </p>
@@ -93,8 +93,8 @@ export default async function StatsPage() {
             {integrity.flagged.map((f) => (
               <div key={f.reportId} className="py-3 flex items-start justify-between gap-4">
                 <div className="min-w-0">
-                  <p className="text-sm font-medium text-[#0f172a]">{f.name}</p>
-                  <p className="text-xs text-[#94a3b8] mt-0.5">
+                  <p className="text-sm font-medium text-[var(--foreground)]">{f.name}</p>
+                  <p className="text-xs text-[var(--text-faint)] mt-0.5">
                     {new Date(f.date).toLocaleDateString("de-DE", { day: "2-digit", month: "long", year: "numeric" })}
                     {f.score !== null && ` · Score ${f.score}`}
                   </p>
@@ -106,39 +106,39 @@ export default async function StatsPage() {
                     ))}
                   </div>
                 </div>
-                <span className="text-xs text-red-600 font-medium tabular-nums flex-shrink-0">
+                <span className="text-xs text-[var(--danger)] font-medium tabular-nums flex-shrink-0">
                   {f.violationCount} Verstöße
                 </span>
               </div>
             ))}
           </div>
         )}
-        <p className="text-xs text-[#94a3b8] mt-4">
+        <p className="text-xs text-[var(--text-faint)] mt-4">
           Auffällige Reports sollten neu analysiert oder gelöscht werden. Wettbewerber-Reports werden bereits
           zur Schreibzeit im Haupt-Tool durch dieselbe Invariante geprüft.
         </p>
       </section>
 
       {/* ───────── Plan distribution ───────── */}
-      <section className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
-        <h2 className="text-sm font-semibold text-[#0f172a]">Tarif-Verteilung</h2>
-        <p className="text-xs text-[#64748b] mt-0.5 mb-4">Nutzer pro Plan</p>
+      <section className="bg-white rounded-xl border border-[var(--border-subtle)] shadow-sm p-6">
+        <h2 className="text-sm font-semibold text-[var(--foreground)]">Tarif-Verteilung</h2>
+        <p className="text-xs text-[var(--text-muted)] mt-0.5 mb-4">Nutzer pro Plan</p>
         <PlanDistribution byPlan={stats.users.byPlan} total={totalUsers} />
       </section>
 
       {/* ───────── Reports per day (7d) ───────── */}
-      <section className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
-        <h2 className="text-sm font-semibold text-[#0f172a]">Reports pro Tag</h2>
-        <p className="text-xs text-[#64748b] mt-0.5 mb-4">
+      <section className="bg-white rounded-xl border border-[var(--border-subtle)] shadow-sm p-6">
+        <h2 className="text-sm font-semibold text-[var(--foreground)]">Reports pro Tag</h2>
+        <p className="text-xs text-[var(--text-muted)] mt-0.5 mb-4">
           Letzte 7 Tage · {stats.reports.last7d} Reports gesamt
         </p>
         <DailyBarChart data={stats.reports.dailyLast7d} />
       </section>
 
       {/* ───────── Cron Health ───────── */}
-      <section className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
-        <h2 className="text-sm font-semibold text-[#0f172a]">Cron-Health</h2>
-        <p className="text-xs text-[#64748b] mt-0.5 mb-4">
+      <section className="bg-white rounded-xl border border-[var(--border-subtle)] shadow-sm p-6">
+        <h2 className="text-sm font-semibold text-[var(--foreground)]">Cron-Health</h2>
+        <p className="text-xs text-[var(--text-muted)] mt-0.5 mb-4">
           Status des täglichen Cron-Jobs (/api/cron/run-scheduled-checks im Haupt-Projekt)
         </p>
 
@@ -174,36 +174,36 @@ export default async function StatsPage() {
       {overdue.length > 0 && (
         <section className="bg-white rounded-xl border border-amber-100 shadow-sm">
           <header className="px-6 py-4 border-b border-amber-100 bg-amber-50/30">
-            <h2 className="text-sm font-semibold text-[#0f172a]">Überfällige Schedules</h2>
-            <p className="text-xs text-[#64748b] mt-0.5">
+            <h2 className="text-sm font-semibold text-[var(--foreground)]">Überfällige Schedules</h2>
+            <p className="text-xs text-[var(--text-muted)] mt-0.5">
               Aktive Topics mit next_run_at &gt; 6h in der Vergangenheit (Top {overdue.length})
             </p>
           </header>
           <table className="w-full text-sm">
-            <thead className="bg-[#f8f9fb] border-b border-gray-100">
+            <thead className="bg-[var(--surface-muted)] border-b border-[var(--border-subtle)]">
               <tr>
-                <th className="text-left px-6 py-3 text-xs font-semibold text-[#64748b] uppercase tracking-wider">Topic</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-[#64748b] uppercase tracking-wider">Nutzer</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-[#64748b] uppercase tracking-wider">Cadence</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-[#64748b] uppercase tracking-wider">Nächster Run</th>
-                <th className="text-right px-6 py-3 text-xs font-semibold text-[#64748b] uppercase tracking-wider">Überfällig</th>
+                <th className="text-left px-6 py-3 text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider">Topic</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider">Nutzer</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider">Cadence</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider">Nächster Run</th>
+                <th className="text-right px-6 py-3 text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider">Überfällig</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
               {overdue.map((s) => (
-                <tr key={s.id} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-6 py-3 font-medium text-[#0f172a]">{s.name}</td>
+                <tr key={s.id} className="hover:bg-[var(--surface-muted)] transition-colors">
+                  <td className="px-6 py-3 font-medium text-[var(--foreground)]">{s.name}</td>
                   <td className="px-4 py-3 text-xs">
                     {s.profile_email ? (
-                      <Link href={`/dashboard/users/${s.profile_id}`} className="text-[#4F6EF7] hover:underline">
+                      <Link href={`/dashboard/users/${s.profile_id}`} className="text-[var(--accent)] hover:underline">
                         {s.profile_email}
                       </Link>
                     ) : (
-                      <span className="text-[#94a3b8]">—</span>
+                      <span className="text-[var(--text-faint)]">—</span>
                     )}
                   </td>
-                  <td className="px-4 py-3 text-xs text-[#64748b] capitalize">{s.frequency}</td>
-                  <td className="px-4 py-3 text-xs text-[#64748b]">
+                  <td className="px-4 py-3 text-xs text-[var(--text-muted)] capitalize">{s.frequency}</td>
+                  <td className="px-4 py-3 text-xs text-[var(--text-muted)]">
                     {new Date(s.next_run_at).toLocaleString("de-DE", { dateStyle: "short", timeStyle: "short" })}
                   </td>
                   <td className="px-6 py-3 text-right">
@@ -225,23 +225,23 @@ export default async function StatsPage() {
 
 function Kpi({ label, value, sub }: { label: string; value: number | string; sub?: string }) {
   return (
-    <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
-      <p className="text-[10px] uppercase tracking-wider font-semibold text-[#94a3b8]">{label}</p>
-      <p className="text-2xl font-semibold text-[#0f172a] mt-1">{value}</p>
-      {sub && <p className="text-xs text-[#64748b] mt-1">{sub}</p>}
+    <div className="bg-white rounded-xl border border-[var(--border-subtle)] shadow-sm p-4">
+      <p className="text-[10px] uppercase tracking-wider font-semibold text-[var(--text-faint)]">{label}</p>
+      <p className="text-2xl font-semibold text-[var(--foreground)] mt-1">{value}</p>
+      {sub && <p className="text-xs text-[var(--text-muted)] mt-1">{sub}</p>}
     </div>
   )
 }
 
 function HealthCard({ label, value, sub, ok }: { label: string; value: number | string; sub?: string; ok: boolean }) {
   return (
-    <div className={`rounded-lg border p-4 ${ok ? "border-gray-100 bg-[#f8f9fb]" : "border-amber-100 bg-amber-50/30"}`}>
+    <div className={`rounded-lg border p-4 ${ok ? "border-[var(--border-subtle)] bg-[var(--surface-muted)]" : "border-amber-100 bg-amber-50/30"}`}>
       <div className="flex items-center gap-2">
-        <span className={`w-1.5 h-1.5 rounded-full ${ok ? "bg-green-500" : "bg-amber-500"}`} />
-        <p className="text-[10px] uppercase tracking-wider font-semibold text-[#94a3b8]">{label}</p>
+        <span className={`w-1.5 h-1.5 rounded-full ${ok ? "bg-[var(--success)]" : "bg-amber-500"}`} />
+        <p className="text-[10px] uppercase tracking-wider font-semibold text-[var(--text-faint)]">{label}</p>
       </div>
-      <p className="text-base font-semibold text-[#0f172a] mt-1">{value}</p>
-      {sub && <p className="text-xs text-[#64748b] mt-0.5">{sub}</p>}
+      <p className="text-base font-semibold text-[var(--foreground)] mt-1">{value}</p>
+      {sub && <p className="text-xs text-[var(--text-muted)] mt-0.5">{sub}</p>}
     </div>
   )
 }
@@ -249,7 +249,7 @@ function HealthCard({ label, value, sub, ok }: { label: string; value: number | 
 function PlanDistribution({ byPlan, total }: { byPlan: Record<string, number>; total: number }) {
   const plans = Object.entries(byPlan)
   if (total === 0) {
-    return <p className="text-xs text-[#94a3b8]">Keine Nutzer.</p>
+    return <p className="text-xs text-[var(--text-faint)]">Keine Nutzer.</p>
   }
   return (
     <div className="space-y-2">
@@ -257,12 +257,12 @@ function PlanDistribution({ byPlan, total }: { byPlan: Record<string, number>; t
         const pct = total === 0 ? 0 : Math.round((count / total) * 100)
         return (
           <div key={plan} className="flex items-center gap-3 text-xs">
-            <span className="w-20 text-[#64748b] capitalize">{PLAN_LABEL[plan] ?? plan}</span>
-            <div className="flex-1 h-5 bg-[#f8f9fb] rounded-md overflow-hidden border border-gray-100">
-              <div className="h-full bg-[#4F6EF7] transition-all" style={{ width: `${pct}%` }} />
+            <span className="w-20 text-[var(--text-muted)] capitalize">{PLAN_LABEL[plan] ?? plan}</span>
+            <div className="flex-1 h-5 bg-[var(--surface-muted)] rounded-md overflow-hidden border border-[var(--border-subtle)]">
+              <div className="h-full bg-[var(--accent)] transition-all" style={{ width: `${pct}%` }} />
             </div>
-            <span className="w-16 text-right text-[#0f172a] font-medium">
-              {count} <span className="text-[#94a3b8]">({pct}%)</span>
+            <span className="w-16 text-right text-[var(--foreground)] font-medium">
+              {count} <span className="text-[var(--text-faint)]">({pct}%)</span>
             </span>
           </div>
         )
@@ -287,8 +287,8 @@ function DailyBarChart({ data }: { data: { date: string; count: number }[] }) {
         const value = Math.round(max * t)
         return (
           <g key={t}>
-            <line x1={padding.left} x2={width - padding.right} y1={y} y2={y} stroke="#e2e8f0" strokeDasharray="2 3" />
-            <text x={padding.left - 6} y={y + 3} textAnchor="end" fontSize="10" fill="#94a3b8">{value}</text>
+            <line x1={padding.left} x2={width - padding.right} y1={y} y2={y} stroke="var(--border-subtle)" strokeDasharray="2 3" />
+            <text x={padding.left - 6} y={y + 3} textAnchor="end" fontSize="10" fill="var(--text-faint)">{value}</text>
           </g>
         )
       })}
@@ -299,11 +299,11 @@ function DailyBarChart({ data }: { data: { date: string; count: number }[] }) {
         const isToday = i === data.length - 1
         return (
           <g key={d.date}>
-            <rect x={x} y={y} width={barWidth} height={barH} fill={isToday ? "#4F6EF7" : "#A5B4FC"} rx="3" />
+            <rect x={x} y={y} width={barWidth} height={barH} fill={isToday ? "var(--accent)" : "var(--accent-soft)"} rx="3" />
             {d.count > 0 && (
-              <text x={x + barWidth / 2} y={y - 4} textAnchor="middle" fontSize="10" fill="#0f172a" fontWeight="600">{d.count}</text>
+              <text x={x + barWidth / 2} y={y - 4} textAnchor="middle" fontSize="10" fill="var(--foreground)" fontWeight="600">{d.count}</text>
             )}
-            <text x={x + barWidth / 2} y={height - 8} textAnchor="middle" fontSize="10" fill="#94a3b8">
+            <text x={x + barWidth / 2} y={height - 8} textAnchor="middle" fontSize="10" fill="var(--text-faint)">
               {new Date(d.date).toLocaleDateString("de-DE", { weekday: "short" })}
             </text>
           </g>

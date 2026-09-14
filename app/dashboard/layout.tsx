@@ -33,20 +33,15 @@ export default async function AdminLayout({ children }: { children: ReactNode })
   if (!profile?.is_admin) redirect("/login")
 
   return (
-    <div className="flex h-screen bg-[#f8f9fb] overflow-hidden">
+    <div className="flex h-screen bg-[var(--surface-muted)] overflow-hidden">
 
       {/* Sidebar */}
-      <aside className="w-[220px] flex-shrink-0 bg-white border-r border-gray-100 flex flex-col">
-        <div className="h-[60px] flex items-center px-5 border-b border-gray-100 gap-2.5">
-          <div className="w-7 h-7 rounded-lg bg-[#0f172a] flex items-center justify-center flex-shrink-0">
-            <span className="text-white text-xs font-bold">A</span>
-          </div>
-          <div>
-            <span className="text-[#0f172a] font-semibold text-sm tracking-tight">Auralis</span>
-            <span className="ml-2 text-[10px] text-[#94a3b8] bg-gray-100 px-1.5 py-0.5 rounded font-medium">
-              Admin
-            </span>
-          </div>
+      <aside className="w-[220px] flex-shrink-0 bg-white border-r border-[var(--border-subtle)] flex flex-col">
+        <div className="h-[60px] flex items-center px-5 border-b border-[var(--border-subtle)] gap-2.5">
+          <img src="/brand/combinationmark-black.svg" alt="DigitalHalo" className="h-5 w-auto flex-shrink-0" />
+          <span className="text-[10px] text-[var(--text-faint)] bg-[var(--surface-sunken)] px-1.5 py-0.5 rounded font-medium">
+            Admin
+          </span>
         </div>
 
         <nav className="flex-1 px-3 py-4 space-y-0.5">
@@ -61,12 +56,12 @@ export default async function AdminLayout({ children }: { children: ReactNode })
           </NavLink>
         </nav>
 
-        <div className="px-5 py-4 border-t border-gray-100 space-y-2">
-          <p className="text-xs text-[#64748b] truncate">{profile?.email ?? ""}</p>
+        <div className="px-5 py-4 border-t border-[var(--border-subtle)] space-y-2">
+          <p className="text-xs text-[var(--text-muted)] truncate">{profile?.email ?? ""}</p>
           <form action={actionSignOut}>
             <button
               type="submit"
-              className="text-xs text-[#64748b] hover:text-[#0f172a] transition-colors"
+              className="text-xs text-[var(--text-muted)] hover:text-[var(--foreground)] transition-colors"
             >
               Abmelden →
             </button>
@@ -76,12 +71,12 @@ export default async function AdminLayout({ children }: { children: ReactNode })
 
       {/* Main */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        <header className="h-[60px] flex-shrink-0 bg-white border-b border-gray-100 flex items-center px-6 gap-4">
+        <header className="h-[60px] flex-shrink-0 bg-white border-b border-[var(--border-subtle)] flex items-center px-6 gap-4">
           <HeaderTitle />
           <div className="flex-1" />
-          <span className="text-xs text-[#94a3b8]">
+          <span className="text-xs text-[var(--text-faint)]">
             Angemeldet als{" "}
-            <span className="text-[#64748b] font-medium">{profile?.email ?? ""}</span>
+            <span className="text-[var(--text-muted)] font-medium">{profile?.email ?? ""}</span>
           </span>
         </header>
 

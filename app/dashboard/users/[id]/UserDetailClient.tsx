@@ -98,33 +98,33 @@ export default function UserDetailClient({
       )}
 
       {/* ───────────── Profile Header ───────────── */}
-      <section className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
+      <section className="bg-white rounded-xl border border-[var(--border-subtle)] shadow-sm p-6">
         <div className="flex items-start gap-4">
-          <div className="w-14 h-14 rounded-full bg-blue-50 border border-blue-100 flex items-center justify-center flex-shrink-0">
-            <span className="text-base font-semibold text-[#4F6EF7]">{initials}</span>
+          <div className="w-14 h-14 rounded-full bg-[var(--accent-soft)] border border-[var(--accent)]/20 flex items-center justify-center flex-shrink-0">
+            <span className="text-base font-semibold text-[var(--accent)]">{initials}</span>
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="text-lg font-semibold text-[#0f172a] truncate">
+              <h1 className="text-lg font-semibold text-[var(--foreground)] truncate">
                 {profile.full_name ?? "—"}
               </h1>
               {profile.is_admin && (
-                <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-[#64748b] font-medium">
+                <span className="text-xs px-2 py-0.5 rounded-full bg-[var(--surface-sunken)] text-[var(--text-muted)] font-medium">
                   Admin
                 </span>
               )}
               {isSelf && (
-                <span className="text-xs px-2 py-0.5 rounded-full bg-blue-50 text-[#4F6EF7] font-medium border border-blue-100">
+                <span className="text-xs px-2 py-0.5 rounded-full bg-[var(--accent-soft)] text-[var(--accent)] font-medium border border-[var(--accent)]/20">
                   Du
                 </span>
               )}
               {isBanned && (
-                <span className="text-xs px-2 py-0.5 rounded-full bg-red-50 text-red-600 font-medium border border-red-100">
+                <span className="text-xs px-2 py-0.5 rounded-full bg-[var(--danger-soft)] text-[var(--danger)] font-medium border border-[var(--danger)]/20">
                   Gesperrt
                 </span>
               )}
             </div>
-            <p className="text-sm text-[#64748b] mt-0.5">{profile.email}</p>
+            <p className="text-sm text-[var(--text-muted)] mt-0.5">{profile.email}</p>
 
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-4">
               <KV label="Tarif" value={<span className="capitalize">{profile.plan}</span>} />
@@ -150,11 +150,11 @@ export default function UserDetailClient({
       </section>
 
       {/* ───────────── Topics (monitoring_schedules) ───────────── */}
-      <section className="bg-white rounded-xl border border-gray-100 shadow-sm">
-        <header className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+      <section className="bg-white rounded-xl border border-[var(--border-subtle)] shadow-sm">
+        <header className="px-6 py-4 border-b border-[var(--border-subtle)] flex items-center justify-between">
           <div>
-            <h2 className="text-sm font-semibold text-[#0f172a]">Themen / Monitoring-Schedules</h2>
-            <p className="text-xs text-[#64748b] mt-0.5">
+            <h2 className="text-sm font-semibold text-[var(--foreground)]">Themen / Monitoring-Schedules</h2>
+            <p className="text-xs text-[var(--text-muted)] mt-0.5">
               {schedules.length === 0
                 ? "Keine Themen angelegt."
                 : `${schedules.filter(s => s.is_active).length} aktiv · ${schedules.length} gesamt`}
@@ -163,7 +163,7 @@ export default function UserDetailClient({
         </header>
 
         {schedules.length === 0 ? (
-          <div className="px-6 py-10 text-center text-sm text-[#94a3b8]">
+          <div className="px-6 py-10 text-center text-sm text-[var(--text-faint)]">
             Dieser Nutzer hat noch keine Themen angelegt.
           </div>
         ) : (
@@ -176,9 +176,9 @@ export default function UserDetailClient({
                   <div className="flex items-start gap-4">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <p className="font-medium text-[#0f172a]">{s.name}</p>
+                        <p className="font-medium text-[var(--foreground)]">{s.name}</p>
                         {!s.is_active && (
-                          <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-[#94a3b8] font-medium">
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-[var(--surface-sunken)] text-[var(--text-faint)] font-medium">
                             Inaktiv
                           </span>
                         )}
@@ -188,8 +188,8 @@ export default function UserDetailClient({
                           </span>
                         )}
                       </div>
-                      <p className="text-xs text-[#64748b] mt-1 truncate">{s.query}</p>
-                      <div className="flex items-center gap-4 text-xs text-[#94a3b8] mt-2 flex-wrap">
+                      <p className="text-xs text-[var(--text-muted)] mt-1 truncate">{s.query}</p>
+                      <div className="flex items-center gap-4 text-xs text-[var(--text-faint)] mt-2 flex-wrap">
                         <span>{LANG_FLAG[s.language] ?? "🏳️"} {s.language.toUpperCase()}</span>
                         <span>
                           Letzter Run:{" "}
@@ -210,7 +210,7 @@ export default function UserDetailClient({
                         value={s.frequency}
                         onChange={e => handleFrequencyChange(s.id, e.target.value as FrequencyType)}
                         disabled={isPending || running}
-                        className="bg-white border border-gray-200 rounded-lg px-3 py-1.5 text-xs text-[#0f172a] focus:outline-none focus:border-[#4F6EF7] transition-colors cursor-pointer"
+                        className="bg-white border border-[var(--border-subtle)] rounded-lg px-3 py-1.5 text-xs text-[var(--foreground)] focus:outline-none focus:border-[var(--accent)] transition-colors cursor-pointer"
                       >
                         {FREQUENCIES.map(f => (
                           <option key={f.value} value={f.value}>{f.label}</option>
@@ -221,7 +221,7 @@ export default function UserDetailClient({
                         type="button"
                         onClick={() => handleToggleSchedule(s.id, !s.is_active)}
                         disabled={isPending || running}
-                        className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-[#64748b] hover:border-[#4F6EF7] hover:text-[#4F6EF7] transition-colors disabled:opacity-40"
+                        className="text-xs px-3 py-1.5 rounded-lg border border-[var(--border-subtle)] text-[var(--text-muted)] hover:border-[var(--accent)] hover:text-[var(--accent)] transition-colors disabled:opacity-40"
                       >
                         {s.is_active ? "Deaktivieren" : "Aktivieren"}
                       </button>
@@ -230,11 +230,11 @@ export default function UserDetailClient({
                         type="button"
                         onClick={() => handleRunAnalysis(s.id, s.name)}
                         disabled={running || isPending}
-                        className="text-xs px-3 py-1.5 rounded-lg bg-[#4F6EF7] text-white font-medium hover:bg-[#3b5bd9] transition-colors disabled:opacity-50 flex items-center gap-1.5"
+                        className="text-xs px-3 py-1.5 rounded-lg bg-[var(--accent)] text-white font-medium hover:bg-[var(--accent-strong)] transition-colors disabled:opacity-50 flex items-center gap-1.5"
                       >
                         {running ? (
                           <>
-                            <span className="w-3 h-3 border border-blue-200 border-t-white rounded-full animate-spin" />
+                            <span className="w-3 h-3 border border-[var(--accent)]/30 border-t-white rounded-full animate-spin" />
                             Läuft…
                           </>
                         ) : (
@@ -251,10 +251,10 @@ export default function UserDetailClient({
       </section>
 
       {/* ───────────── Reports (visibility_reports) ───────────── */}
-      <section className="bg-white rounded-xl border border-gray-100 shadow-sm">
-        <header className="px-6 py-4 border-b border-gray-100">
-          <h2 className="text-sm font-semibold text-[#0f172a]">Letzte Analysen</h2>
-          <p className="text-xs text-[#64748b] mt-0.5">
+      <section className="bg-white rounded-xl border border-[var(--border-subtle)] shadow-sm">
+        <header className="px-6 py-4 border-b border-[var(--border-subtle)]">
+          <h2 className="text-sm font-semibold text-[var(--foreground)]">Letzte Analysen</h2>
+          <p className="text-xs text-[var(--text-muted)] mt-0.5">
             {reports.length === 0
               ? "Noch keine Reports vorhanden."
               : `${reports.length} Reports (max. 25 angezeigt)`}
@@ -262,44 +262,44 @@ export default function UserDetailClient({
         </header>
 
         {reports.length === 0 ? (
-          <div className="px-6 py-10 text-center text-sm text-[#94a3b8]">
+          <div className="px-6 py-10 text-center text-sm text-[var(--text-faint)]">
             Noch keine Analysen. Trigger eine über „Jetzt analysieren" oben.
           </div>
         ) : (
           <table className="w-full text-sm">
-            <thead className="bg-[#f8f9fb] border-b border-gray-100">
+            <thead className="bg-[var(--surface-muted)] border-b border-[var(--border-subtle)]">
               <tr>
-                <th className="text-left px-6 py-3 text-xs font-semibold text-[#64748b] uppercase tracking-wider">Datum</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-[#64748b] uppercase tracking-wider">Trigger</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-[#64748b] uppercase tracking-wider">Score</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-[#64748b] uppercase tracking-wider">Sentiment</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-[#64748b] uppercase tracking-wider">Summary</th>
-                <th className="text-right px-6 py-3 text-xs font-semibold text-[#64748b] uppercase tracking-wider"></th>
+                <th className="text-left px-6 py-3 text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider">Datum</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider">Trigger</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider">Score</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider">Sentiment</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider">Summary</th>
+                <th className="text-right px-6 py-3 text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
               {reports.map(r => (
-                <tr key={r.id} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-6 py-3 text-xs text-[#64748b] whitespace-nowrap">
+                <tr key={r.id} className="hover:bg-[var(--surface-muted)] transition-colors">
+                  <td className="px-6 py-3 text-xs text-[var(--text-muted)] whitespace-nowrap">
                     {new Date(r.created_at).toLocaleString("de-DE", { dateStyle: "short", timeStyle: "short" })}
                   </td>
                   <td className="px-4 py-3">
                     <TriggerBadge trigger={r.trigger} />
                   </td>
-                  <td className="px-4 py-3 font-medium text-[#0f172a]">
+                  <td className="px-4 py-3 font-medium text-[var(--foreground)]">
                     {r.visibility_score != null ? `${r.visibility_score}/100` : "—"}
                   </td>
                   <td className="px-4 py-3">
                     <SentimentBadge sentiment={r.sentiment} />
                   </td>
-                  <td className="px-4 py-3 text-xs text-[#64748b] truncate max-w-md">
+                  <td className="px-4 py-3 text-xs text-[var(--text-muted)] truncate max-w-md">
                     {r.summary ?? "—"}
                   </td>
                   <td className="px-6 py-3 text-right">
                     <button
                       type="button"
                       onClick={() => setOpenReportId(r.id)}
-                      className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-[#64748b] hover:border-[#4F6EF7] hover:text-[#4F6EF7] transition-colors"
+                      className="text-xs px-3 py-1.5 rounded-lg border border-[var(--border-subtle)] text-[var(--text-muted)] hover:border-[var(--accent)] hover:text-[var(--accent)] transition-colors"
                     >
                       Details
                     </button>
@@ -366,10 +366,10 @@ function ReportDrawer({
         className="w-full max-w-2xl h-full bg-white shadow-xl overflow-y-auto"
         onClick={e => e.stopPropagation()}
       >
-        <header className="sticky top-0 z-10 bg-white border-b border-gray-100 px-6 py-4 flex items-center justify-between">
+        <header className="sticky top-0 z-10 bg-white border-b border-[var(--border-subtle)] px-6 py-4 flex items-center justify-between">
           <div>
-            <h3 className="text-base font-semibold text-[#0f172a]">Report-Details</h3>
-            <p className="text-xs text-[#64748b] mt-0.5">
+            <h3 className="text-base font-semibold text-[var(--foreground)]">Report-Details</h3>
+            <p className="text-xs text-[var(--text-muted)] mt-0.5">
               {new Date(report.created_at).toLocaleString("de-DE", { dateStyle: "short", timeStyle: "short" })} ·{" "}
               <TriggerBadge trigger={report.trigger} />
             </p>
@@ -377,7 +377,7 @@ function ReportDrawer({
           <button
             type="button"
             onClick={onClose}
-            className="text-[#94a3b8] hover:text-[#0f172a] text-lg leading-none"
+            className="text-[var(--text-faint)] hover:text-[var(--foreground)] text-lg leading-none"
           >
             ✕
           </button>
@@ -393,8 +393,8 @@ function ReportDrawer({
 
           {report.summary && (
             <div>
-              <p className="text-xs uppercase tracking-wider font-semibold text-[#94a3b8] mb-1.5">Summary</p>
-              <p className="text-sm text-[#0f172a] bg-[#f8f9fb] border border-gray-100 rounded-lg px-3 py-2">
+              <p className="text-xs uppercase tracking-wider font-semibold text-[var(--text-faint)] mb-1.5">Summary</p>
+              <p className="text-sm text-[var(--foreground)] bg-[var(--surface-muted)] border border-[var(--border-subtle)] rounded-lg px-3 py-2">
                 {report.summary}
               </p>
             </div>
@@ -402,47 +402,47 @@ function ReportDrawer({
 
           {/* Query Results */}
           <div>
-            <p className="text-xs uppercase tracking-wider font-semibold text-[#94a3b8] mb-1.5">
+            <p className="text-xs uppercase tracking-wider font-semibold text-[var(--text-faint)] mb-1.5">
               Query-Ergebnisse pro LLM-Call
             </p>
             {loading && (
-              <p className="text-xs text-[#64748b]">Lade Query-Results…</p>
+              <p className="text-xs text-[var(--text-muted)]">Lade Query-Results…</p>
             )}
             {error && (
-              <p className="text-xs text-red-600">{error}</p>
+              <p className="text-xs text-[var(--danger)]">{error}</p>
             )}
             {queryResults && queryResults.length === 0 && (
-              <p className="text-xs text-[#64748b]">Keine Query-Results für diesen Report.</p>
+              <p className="text-xs text-[var(--text-muted)]">Keine Query-Results für diesen Report.</p>
             )}
             {queryResults && queryResults.length > 0 && (
               <ul className="space-y-3">
                 {queryResults.map((q, idx) => (
-                  <li key={q.id} className="border border-gray-100 rounded-lg p-3 bg-[#f8f9fb]">
+                  <li key={q.id} className="border border-[var(--border-subtle)] rounded-lg p-3 bg-[var(--surface-muted)]">
                     <div className="flex items-center gap-2 mb-2 text-xs">
-                      <span className="font-medium text-[#0f172a]">#{idx + 1}</span>
-                      <span className="text-[#64748b]">{q.model}</span>
+                      <span className="font-medium text-[var(--foreground)]">#{idx + 1}</span>
+                      <span className="text-[var(--text-muted)]">{q.model}</span>
                       {q.brand_mentioned && (
                         <span className="px-2 py-0.5 rounded-full bg-green-50 text-green-600 border border-green-100 font-medium">
                           Erwähnt
                         </span>
                       )}
                       {q.position != null && (
-                        <span className="px-2 py-0.5 rounded-full bg-gray-100 text-[#64748b] font-medium">
+                        <span className="px-2 py-0.5 rounded-full bg-[var(--surface-sunken)] text-[var(--text-muted)] font-medium">
                           Position {q.position}
                         </span>
                       )}
                       <SentimentBadge sentiment={q.sentiment} />
                     </div>
-                    <p className="text-xs text-[#64748b] mb-1.5">
+                    <p className="text-xs text-[var(--text-muted)] mb-1.5">
                       <span className="font-semibold uppercase tracking-wider mr-1">Prompt:</span>
                       {q.prompt}
                     </p>
                     {q.response && (
                       <details className="text-xs">
-                        <summary className="cursor-pointer text-[#4F6EF7] hover:underline">
+                        <summary className="cursor-pointer text-[var(--accent)] hover:underline">
                           Response anzeigen
                         </summary>
-                        <pre className="mt-1.5 whitespace-pre-wrap text-[#0f172a] bg-white border border-gray-100 rounded p-2">
+                        <pre className="mt-1.5 whitespace-pre-wrap text-[var(--foreground)] bg-white border border-[var(--border-subtle)] rounded p-2">
                           {q.response}
                         </pre>
                       </details>
@@ -455,8 +455,8 @@ function ReportDrawer({
 
           {/* Raw data */}
           <div>
-            <p className="text-xs uppercase tracking-wider font-semibold text-[#94a3b8] mb-1.5">Raw Data (jsonb)</p>
-            <pre className="text-[10px] text-[#0f172a] bg-[#f8f9fb] border border-gray-100 rounded-lg p-3 overflow-x-auto max-h-96 overflow-y-auto">
+            <p className="text-xs uppercase tracking-wider font-semibold text-[var(--text-faint)] mb-1.5">Raw Data (jsonb)</p>
+            <pre className="text-[10px] text-[var(--foreground)] bg-[var(--surface-muted)] border border-[var(--border-subtle)] rounded-lg p-3 overflow-x-auto max-h-96 overflow-y-auto">
               {rawDataPretty}
             </pre>
           </div>
@@ -478,7 +478,7 @@ type QueryResultLite = {
 
 function TriggerBadge({ trigger }: { trigger: "scheduled" | "manual" | "webhook" }) {
   const styles: Record<string, string> = {
-    scheduled: "bg-blue-50 text-[#4F6EF7] border-blue-100",
+    scheduled: "bg-[var(--accent-soft)] text-[var(--accent)] border-[var(--accent)]/20",
     manual:    "bg-amber-50 text-amber-700 border-amber-100",
     webhook:   "bg-purple-50 text-purple-700 border-purple-100",
   }
@@ -491,12 +491,12 @@ function TriggerBadge({ trigger }: { trigger: "scheduled" | "manual" | "webhook"
 
 function SentimentBadge({ sentiment }: { sentiment: "positive" | "neutral" | "negative" | null }) {
   if (!sentiment) {
-    return <span className="text-xs text-[#94a3b8]">—</span>
+    return <span className="text-xs text-[var(--text-faint)]">—</span>
   }
   const styles: Record<string, string> = {
     positive: "bg-green-50 text-green-600 border-green-100",
-    neutral:  "bg-gray-100 text-[#64748b] border-gray-200",
-    negative: "bg-red-50 text-red-600 border-red-100",
+    neutral:  "bg-[var(--surface-sunken)] text-[var(--text-muted)] border-[var(--border-subtle)]",
+    negative: "bg-[var(--danger-soft)] text-[var(--danger)] border-[var(--danger)]/20",
   }
   return (
     <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${styles[sentiment] ?? ""}`}>
@@ -508,17 +508,17 @@ function SentimentBadge({ sentiment }: { sentiment: "positive" | "neutral" | "ne
 function KV({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div>
-      <p className="text-[10px] uppercase tracking-wider font-semibold text-[#94a3b8] mb-0.5">{label}</p>
-      <p className="text-sm text-[#0f172a]">{value}</p>
+      <p className="text-[10px] uppercase tracking-wider font-semibold text-[var(--text-faint)] mb-0.5">{label}</p>
+      <p className="text-sm text-[var(--foreground)]">{value}</p>
     </div>
   )
 }
 
 function Metric({ label, value }: { label: string; value: React.ReactNode }) {
   return (
-    <div className="border border-gray-100 rounded-lg px-3 py-2 bg-[#f8f9fb]">
-      <p className="text-[10px] uppercase tracking-wider font-semibold text-[#94a3b8]">{label}</p>
-      <p className="text-sm text-[#0f172a] mt-0.5">{value}</p>
+    <div className="border border-[var(--border-subtle)] rounded-lg px-3 py-2 bg-[var(--surface-muted)]">
+      <p className="text-[10px] uppercase tracking-wider font-semibold text-[var(--text-faint)]">{label}</p>
+      <p className="text-sm text-[var(--foreground)] mt-0.5">{value}</p>
     </div>
   )
 }
@@ -533,7 +533,7 @@ function Banner({
   children: React.ReactNode
 }) {
   const styles = kind === "error"
-    ? "bg-red-50 border-red-100 text-red-600"
+    ? "bg-[var(--danger-soft)] border-[var(--danger)]/20 text-[var(--danger)]"
     : "bg-green-50 border-green-100 text-green-700"
   return (
     <div className={`rounded-lg border px-4 py-3 flex items-start gap-3 ${styles}`}>

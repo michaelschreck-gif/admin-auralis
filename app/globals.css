@@ -1,8 +1,32 @@
 @import "tailwindcss";
 
 :root {
-  --background: #f8f9fb;
-  --foreground: #0f172a;
+  /* DigitalHalo brand tokens */
+  --color-beige: #EAE2D5;
+  --color-coral: #FA5935;
+  --color-teal: #8CAAAB;
+
+  --background: #FAF8F3;
+  --foreground: #0E1916;
+
+  --accent: #FA5935;
+  --accent-strong: #E14A2A;
+  --accent-soft: #FDE7E0;
+  --secondary: #6D8C8D;
+
+  --text-muted: #4C6667;
+  --text-faint: #8FA09E;
+
+  --surface-muted: #F3EFE6;
+  --surface-sunken: #EAE2D5;
+  --border-subtle: #E3DCCF;
+
+  --success: #10b981;
+  --success-soft: #d1fae5;
+  --danger: #ef4444;
+  --danger-soft: #fee2e2;
+  --warning: #f59e0b;
+  --warning-soft: #fef3c7;
 }
 
 @theme inline {

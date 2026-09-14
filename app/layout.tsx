@@ -5,8 +5,8 @@ import "./globals.css"
 const inter = Inter({ variable: "--font-inter", subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "Auralis Admin",
-  description: "Admin panel for Auralis",
+  title: "DigitalHalo Admin",
+  description: "Admin panel for DigitalHalo",
 }
 
 export default function RootLayout({

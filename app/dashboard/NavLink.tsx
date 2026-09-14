@@ -26,8 +26,8 @@ export function NavLink({
       href={href}
       className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
         active
-          ? "bg-blue-50 text-[#4F6EF7]"
-          : "text-[#64748b] hover:bg-gray-50 hover:text-[#0f172a]"
+          ? "bg-[var(--accent-soft)] text-[var(--accent)]"
+          : "text-[var(--text-muted)] hover:bg-[var(--surface-muted)] hover:text-[var(--foreground)]"
       }`}
     >
       {icon}
@@ -70,7 +70,7 @@ export function AuditIcon() {
 /** Reactive page title rendered in the header. */
 export function HeaderTitle() {
   const pathname = usePathname()
-  let title = "Auralis Admin"
+  let title = "DigitalHalo Admin"
   if (pathname === "/dashboard" || pathname.startsWith("/dashboard/users")) {
     title = "Nutzerverwaltung"
   } else if (pathname.startsWith("/dashboard/stats")) {
@@ -78,5 +78,5 @@ export function HeaderTitle() {
   } else if (pathname.startsWith("/dashboard/audit")) {
     title = "Audit-Log"
   }
-  return <span className="text-sm font-semibold text-[#0f172a]">{title}</span>
+  return <span className="text-sm font-semibold text-[var(--foreground)]">{title}</span>
 }

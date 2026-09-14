@@ -70,19 +70,19 @@ export default async function UserDetailPage({
   return (
     <div className="space-y-6">
       {/* Breadcrumb */}
-      <nav className="flex items-center gap-2 text-sm text-[#64748b]">
-        <Link href="/dashboard" className="hover:text-[#0f172a] transition-colors">
+      <nav className="flex items-center gap-2 text-sm text-[var(--text-muted)]">
+        <Link href="/dashboard" className="hover:text-[var(--foreground)] transition-colors">
           Nutzerverwaltung
         </Link>
-        <span className="text-[#cbd5e1]">›</span>
-        <span className="text-[#0f172a] font-medium">
+        <span className="text-[var(--border-subtle)]">›</span>
+        <span className="text-[var(--foreground)] font-medium">
           {profile?.full_name ?? profile?.email ?? "Nutzer"}
         </span>
       </nav>
 
       {loadError && (
-        <div className="rounded-lg bg-red-50 border border-red-100 px-4 py-3">
-          <p className="text-xs text-red-600 font-medium">{loadError}</p>
+        <div className="rounded-lg bg-[var(--danger-soft)] border border-[var(--danger)]/20 px-4 py-3">
+          <p className="text-xs text-[var(--danger)] font-medium">{loadError}</p>
         </div>
       )}
 

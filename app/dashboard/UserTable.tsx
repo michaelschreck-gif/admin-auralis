@@ -134,22 +134,22 @@ export default function UserTable({
           defaultValue={search}
           placeholder="Nach E-Mail filtern…"
           onChange={e => handleSearch(e.target.value)}
-          className="bg-white border border-gray-200 rounded-lg px-4 py-2 text-sm text-[#0f172a] placeholder-[#94a3b8] focus:outline-none focus:border-[#4F6EF7] focus:ring-1 focus:ring-[#4F6EF7]/20 w-72 transition-colors"
+          className="bg-white border border-[var(--border-subtle)] rounded-lg px-4 py-2 text-sm text-[var(--foreground)] placeholder-[var(--text-faint)] focus:outline-none focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent)]/20 w-72 transition-colors"
         />
         <button
           type="button"
           onClick={() => setInviteOpen(true)}
-          className="text-sm px-4 py-2 rounded-lg bg-[#4F6EF7] text-white font-medium hover:bg-[#3b5bd9] transition-colors disabled:opacity-50"
+          className="text-sm px-4 py-2 rounded-lg bg-[var(--accent)] text-white font-medium hover:bg-[var(--accent-strong)] transition-colors disabled:opacity-50"
           disabled={isPending}
         >
           + User einladen
         </button>
-        <span className="text-sm text-[#64748b]">
+        <span className="text-sm text-[var(--text-muted)]">
           {totalCount} Nutzer{search || status !== "all" || plan !== "all" ? " (gefiltert)" : " gesamt"}
         </span>
         {isPending && (
-          <span className="text-xs text-[#4F6EF7] flex items-center gap-1.5">
-            <span className="w-3 h-3 border border-blue-200 border-t-[#4F6EF7] rounded-full animate-spin" />
+          <span className="text-xs text-[var(--accent)] flex items-center gap-1.5">
+            <span className="w-3 h-3 border border-[var(--accent)]/30 border-t-[var(--accent)] rounded-full animate-spin" />
             Wird gespeichert…
           </span>
         )}
@@ -157,7 +157,7 @@ export default function UserTable({
 
       {/* Filter pills */}
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-xs uppercase tracking-wider font-semibold text-[#94a3b8] mr-1">Status</span>
+        <span className="text-xs uppercase tracking-wider font-semibold text-[var(--text-faint)] mr-1">Status</span>
         {STATUS_FILTERS.map(s => (
           <FilterPill
             key={s.value}
@@ -167,7 +167,7 @@ export default function UserTable({
             {s.label}
           </FilterPill>
         ))}
-        <span className="text-xs uppercase tracking-wider font-semibold text-[#94a3b8] mx-1 ml-4">Tarif</span>
+        <span className="text-xs uppercase tracking-wider font-semibold text-[var(--text-faint)] mx-1 ml-4">Tarif</span>
         {PLAN_FILTERS.map(p => (
           <FilterPill
             key={p.value}
@@ -181,12 +181,12 @@ export default function UserTable({
 
       {/* Action error */}
       {actionError && (
-        <div className="rounded-lg bg-red-50 border border-red-100 px-4 py-3 flex items-start gap-3">
-          <p className="text-xs text-red-600 font-medium flex-1">{actionError}</p>
+        <div className="rounded-lg bg-[var(--danger-soft)] border border-[var(--danger)]/20 px-4 py-3 flex items-start gap-3">
+          <p className="text-xs text-[var(--danger)] font-medium flex-1">{actionError}</p>
           <button
             type="button"
             onClick={() => setActionError(null)}
-            className="text-xs text-red-600 hover:text-red-800"
+            className="text-xs text-[var(--danger)] hover:text-[var(--danger)]"
           >
             ✕
           </button>
@@ -194,23 +194,23 @@ export default function UserTable({
       )}
 
       {/* ──────────── Table ──────────── */}
-      <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+      <div className="bg-white rounded-xl border border-[var(--border-subtle)] shadow-sm overflow-hidden">
         <table className="w-full text-sm">
-          <thead className="bg-[#f8f9fb] border-b border-gray-100">
+          <thead className="bg-[var(--surface-muted)] border-b border-[var(--border-subtle)]">
             <tr>
-              <th className="text-left px-4 py-3 text-xs font-semibold text-[#64748b] uppercase tracking-wider">#</th>
-              <th className="text-left px-4 py-3 text-xs font-semibold text-[#64748b] uppercase tracking-wider">Nutzer</th>
-              <th className="text-left px-4 py-3 text-xs font-semibold text-[#64748b] uppercase tracking-wider">Plan</th>
-              <th className="text-left px-4 py-3 text-xs font-semibold text-[#64748b] uppercase tracking-wider">Sprache</th>
-              <th className="text-left px-4 py-3 text-xs font-semibold text-[#64748b] uppercase tracking-wider">Erstellt</th>
-              <th className="text-left px-4 py-3 text-xs font-semibold text-[#64748b] uppercase tracking-wider">Status</th>
-              <th className="text-right px-4 py-3 text-xs font-semibold text-[#64748b] uppercase tracking-wider">Aktionen</th>
+              <th className="text-left px-4 py-3 text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider">#</th>
+              <th className="text-left px-4 py-3 text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider">Nutzer</th>
+              <th className="text-left px-4 py-3 text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider">Plan</th>
+              <th className="text-left px-4 py-3 text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider">Sprache</th>
+              <th className="text-left px-4 py-3 text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider">Erstellt</th>
+              <th className="text-left px-4 py-3 text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider">Status</th>
+              <th className="text-right px-4 py-3 text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider">Aktionen</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
             {users.length === 0 && (
               <tr>
-                <td colSpan={7} className="text-center py-12 text-[#94a3b8] text-sm">
+                <td colSpan={7} className="text-center py-12 text-[var(--text-faint)] text-sm">
                   Keine Nutzer gefunden.
                 </td>
               </tr>
@@ -224,35 +224,35 @@ export default function UserTable({
               const lang = LANGUAGES.find(l => l.code === user.language)
 
               return (
-                <tr key={user.id} className={`hover:bg-gray-50 transition-colors ${isBanned ? "opacity-60" : ""}`}>
+                <tr key={user.id} className={`hover:bg-[var(--surface-muted)] transition-colors ${isBanned ? "opacity-60" : ""}`}>
                   {/* # */}
-                  <td className="px-4 py-3 text-[#94a3b8]">{rowNum}</td>
+                  <td className="px-4 py-3 text-[var(--text-faint)]">{rowNum}</td>
 
                   {/* Nutzer */}
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-blue-50 border border-blue-100 flex items-center justify-center flex-shrink-0">
-                        <span className="text-xs font-semibold text-[#4F6EF7]">{initials}</span>
+                      <div className="w-8 h-8 rounded-full bg-[var(--accent-soft)] border border-[var(--accent)]/20 flex items-center justify-center flex-shrink-0">
+                        <span className="text-xs font-semibold text-[var(--accent)]">{initials}</span>
                       </div>
                       <Link
                         href={`/dashboard/users/${user.id}`}
                         className="group"
                         title="Detail-Ansicht öffnen"
                       >
-                        <p className="font-medium text-[#0f172a] group-hover:text-[#4F6EF7] transition-colors">
+                        <p className="font-medium text-[var(--foreground)] group-hover:text-[var(--accent)] transition-colors">
                           {user.full_name ?? "—"}
                         </p>
-                        <p className="text-xs text-[#64748b] group-hover:text-[#4F6EF7] transition-colors">
+                        <p className="text-xs text-[var(--text-muted)] group-hover:text-[var(--accent)] transition-colors">
                           {user.email}
                         </p>
                       </Link>
                       {user.is_admin && (
-                        <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-[#64748b] font-medium">
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-[var(--surface-sunken)] text-[var(--text-muted)] font-medium">
                           Admin
                         </span>
                       )}
                       {isSelf && (
-                        <span className="text-xs px-2 py-0.5 rounded-full bg-blue-50 text-[#4F6EF7] font-medium border border-blue-100">
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-[var(--accent-soft)] text-[var(--accent)] font-medium border border-[var(--accent)]/20">
                           Du
                         </span>
                       )}
@@ -265,7 +265,7 @@ export default function UserTable({
                       value={user.plan}
                       onChange={e => handlePlanChange(user.id, e.target.value as PlanType)}
                       disabled={isPending}
-                      className="bg-white border border-gray-200 rounded-lg px-3 py-1.5 text-xs text-[#0f172a] focus:outline-none focus:border-[#4F6EF7] transition-colors capitalize cursor-pointer"
+                      className="bg-white border border-[var(--border-subtle)] rounded-lg px-3 py-1.5 text-xs text-[var(--foreground)] focus:outline-none focus:border-[var(--accent)] transition-colors capitalize cursor-pointer"
                     >
                       {PLANS.map(p => (
                         <option key={p} value={p}>{p}</option>
@@ -274,12 +274,12 @@ export default function UserTable({
                   </td>
 
                   {/* Sprache */}
-                  <td className="px-4 py-3 text-[#64748b] text-xs">
+                  <td className="px-4 py-3 text-[var(--text-muted)] text-xs">
                     {lang ? <>{lang.flag} {lang.code.toUpperCase()}</> : user.language}
                   </td>
 
                   {/* Erstellt */}
-                  <td className="px-4 py-3 text-[#64748b] text-xs">
+                  <td className="px-4 py-3 text-[var(--text-muted)] text-xs">
                     {new Date(user.created_at).toLocaleDateString("de-DE", {
                       day: "2-digit", month: "short", year: "numeric",
                     })}
@@ -288,13 +288,13 @@ export default function UserTable({
                   {/* Status */}
                   <td className="px-4 py-3">
                     {isBanned ? (
-                      <span className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full bg-red-50 text-red-600 font-medium border border-red-100">
-                        <span className="w-1.5 h-1.5 rounded-full bg-red-500"/>
+                      <span className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full bg-[var(--danger-soft)] text-[var(--danger)] font-medium border border-[var(--danger)]/20">
+                        <span className="w-1.5 h-1.5 rounded-full bg-[var(--danger-soft)]0"/>
                         Gesperrt
                       </span>
                     ) : (
                       <span className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full bg-green-50 text-green-600 font-medium border border-green-100">
-                        <span className="w-1.5 h-1.5 rounded-full bg-green-500"/>
+                        <span className="w-1.5 h-1.5 rounded-full bg-[var(--success)]"/>
                         Aktiv
                       </span>
                     )}
@@ -306,7 +306,7 @@ export default function UserTable({
                       <button
                         onClick={() => setEditUser(user)}
                         disabled={isPending}
-                        className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-[#64748b] hover:border-[#4F6EF7] hover:text-[#4F6EF7] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                        className="text-xs px-3 py-1.5 rounded-lg border border-[var(--border-subtle)] text-[var(--text-muted)] hover:border-[var(--accent)] hover:text-[var(--accent)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                       >
                         Bearbeiten
                       </button>
@@ -316,8 +316,8 @@ export default function UserTable({
                         title={isSelf ? "Du kannst dich nicht selbst sperren" : undefined}
                         className="text-xs px-3 py-1.5 rounded-lg border transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                         style={isBanned
-                          ? { borderColor: "#d1fae5", background: "#f0fdf4", color: "#16a34a" }
-                          : { borderColor: "#fee2e2", background: "#fff5f5", color: "#dc2626" }
+                          ? { borderColor: "var(--success-soft)", background: "var(--success-soft)", color: "var(--success)" }
+                          : { borderColor: "var(--danger-soft)", background: "var(--danger-soft)", color: "var(--danger)" }
                         }
                       >
                         {isBanned ? "Entsperren" : "Sperren"}
@@ -328,8 +328,8 @@ export default function UserTable({
                         title={isSelf ? "Du kannst dich nicht selbst löschen" : undefined}
                         className={`text-xs px-3 py-1.5 rounded-lg border transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
                           confirmDelete === user.id
-                            ? "bg-red-500 text-white border-red-500"
-                            : "border-gray-200 text-[#64748b] hover:border-red-200 hover:text-red-500"
+                            ? "bg-[var(--danger-soft)]0 text-white border-[var(--danger)]"
+                            : "border-[var(--border-subtle)] text-[var(--text-muted)] hover:border-[var(--danger)]/25 hover:text-[var(--danger)]"
                         }`}
                       >
                         {confirmDelete === user.id ? "Bestätigen" : "Löschen"}
@@ -337,7 +337,7 @@ export default function UserTable({
                       {confirmDelete === user.id && (
                         <button
                           onClick={() => setConfirmDelete(null)}
-                          className="text-xs text-[#94a3b8] hover:text-[#64748b] transition-colors"
+                          className="text-xs text-[var(--text-faint)] hover:text-[var(--text-muted)] transition-colors"
                         >
                           ✕
                         </button>
@@ -357,17 +357,17 @@ export default function UserTable({
           <button
             onClick={() => navigate({ page: String(page - 1) })}
             disabled={page <= 1}
-            className="text-sm px-4 py-2 rounded-lg border border-gray-200 text-[#64748b] hover:bg-gray-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            className="text-sm px-4 py-2 rounded-lg border border-[var(--border-subtle)] text-[var(--text-muted)] hover:bg-[var(--surface-muted)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
             ← Zurück
           </button>
-          <span className="text-sm text-[#64748b]">
+          <span className="text-sm text-[var(--text-muted)]">
             Seite {page} von {totalPages}
           </span>
           <button
             onClick={() => navigate({ page: String(page + 1) })}
             disabled={page >= totalPages}
-            className="text-sm px-4 py-2 rounded-lg border border-gray-200 text-[#64748b] hover:bg-gray-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            className="text-sm px-4 py-2 rounded-lg border border-[var(--border-subtle)] text-[var(--text-muted)] hover:bg-[var(--surface-muted)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
             Weiter →
           </button>
@@ -410,8 +410,8 @@ function FilterPill({
       onClick={onClick}
       className={`text-xs px-3 py-1.5 rounded-lg border transition-colors ${
         active
-          ? "bg-[#4F6EF7] text-white border-[#4F6EF7]"
-          : "bg-white text-[#64748b] border-gray-200 hover:border-[#4F6EF7] hover:text-[#4F6EF7]"
+          ? "bg-[var(--accent)] text-white border-[var(--accent)]"
+          : "bg-white text-[var(--text-muted)] border-[var(--border-subtle)] hover:border-[var(--accent)] hover:text-[var(--accent)]"
       }`}
     >
       {children}
@@ -461,7 +461,7 @@ function EditUserModal({
             value={fullName}
             onChange={e => setFullName(e.target.value)}
             placeholder="z.B. Max Mustermann"
-            className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#4F6EF7] focus:ring-1 focus:ring-[#4F6EF7]/20"
+            className="w-full bg-white border border-[var(--border-subtle)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent)]/20"
           />
         </Field>
 
@@ -469,7 +469,7 @@ function EditUserModal({
           <select
             value={language}
             onChange={e => setLanguage(e.target.value as LanguageType)}
-            className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#4F6EF7] focus:ring-1 focus:ring-[#4F6EF7]/20"
+            className="w-full bg-white border border-[var(--border-subtle)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent)]/20"
           >
             {LANGUAGES.map(l => (
               <option key={l.code} value={l.code}>
@@ -480,19 +480,19 @@ function EditUserModal({
         </Field>
 
         <Field label="Admin-Status">
-          <label className="flex items-center gap-3 cursor-pointer p-3 border border-gray-200 rounded-lg hover:border-[#4F6EF7] transition-colors">
+          <label className="flex items-center gap-3 cursor-pointer p-3 border border-[var(--border-subtle)] rounded-lg hover:border-[var(--accent)] transition-colors">
             <input
               type="checkbox"
               checked={isAdmin}
               onChange={e => setIsAdmin(e.target.checked)}
               disabled={isSelf && user.is_admin}
-              className="w-4 h-4 accent-[#4F6EF7]"
+              className="w-4 h-4 accent-[var(--accent)]"
             />
-            <span className="text-sm text-[#0f172a]">
+            <span className="text-sm text-[var(--foreground)]">
               Dieser Nutzer ist Admin
             </span>
             {isSelf && user.is_admin && (
-              <span className="text-xs text-[#94a3b8] ml-auto">
+              <span className="text-xs text-[var(--text-faint)] ml-auto">
                 Du kannst dich nicht selbst entziehen
               </span>
             )}
@@ -505,7 +505,7 @@ function EditUserModal({
           type="button"
           onClick={onClose}
           disabled={isPending}
-          className="text-sm px-4 py-2 rounded-lg border border-gray-200 text-[#64748b] hover:bg-gray-50 transition-colors"
+          className="text-sm px-4 py-2 rounded-lg border border-[var(--border-subtle)] text-[var(--text-muted)] hover:bg-[var(--surface-muted)] transition-colors"
         >
           Abbrechen
         </button>
@@ -513,7 +513,7 @@ function EditUserModal({
           type="button"
           onClick={handleSave}
           disabled={isPending}
-          className="text-sm px-4 py-2 rounded-lg bg-[#4F6EF7] text-white font-medium hover:bg-[#3b5bd9] transition-colors disabled:opacity-50"
+          className="text-sm px-4 py-2 rounded-lg bg-[var(--accent)] text-white font-medium hover:bg-[var(--accent-strong)] transition-colors disabled:opacity-50"
         >
           {isPending ? "Speichert…" : "Speichern"}
         </button>
@@ -548,7 +548,7 @@ function InviteUserModal({
   return (
     <ModalShell onClose={onClose} title="Neuen Nutzer einladen">
       <div className="space-y-4">
-        <p className="text-xs text-[#64748b]">
+        <p className="text-xs text-[var(--text-muted)]">
           Der Nutzer erhält eine E-Mail mit einem Link, um sein Passwort zu setzen.
           Anschließend kann er sich im Haupt-Tool anmelden.
         </p>
@@ -560,7 +560,7 @@ function InviteUserModal({
             onChange={e => setEmail(e.target.value)}
             placeholder="user@example.com"
             autoFocus
-            className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#4F6EF7] focus:ring-1 focus:ring-[#4F6EF7]/20"
+            className="w-full bg-white border border-[var(--border-subtle)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent)]/20"
           />
         </Field>
 
@@ -576,7 +576,7 @@ function InviteUserModal({
           type="button"
           onClick={onClose}
           disabled={isPending}
-          className="text-sm px-4 py-2 rounded-lg border border-gray-200 text-[#64748b] hover:bg-gray-50 transition-colors"
+          className="text-sm px-4 py-2 rounded-lg border border-[var(--border-subtle)] text-[var(--text-muted)] hover:bg-[var(--surface-muted)] transition-colors"
         >
           Schließen
         </button>
@@ -584,7 +584,7 @@ function InviteUserModal({
           type="button"
           onClick={handleInvite}
           disabled={isPending || !email.trim()}
-          className="text-sm px-4 py-2 rounded-lg bg-[#4F6EF7] text-white font-medium hover:bg-[#3b5bd9] transition-colors disabled:opacity-50"
+          className="text-sm px-4 py-2 rounded-lg bg-[var(--accent)] text-white font-medium hover:bg-[var(--accent-strong)] transition-colors disabled:opacity-50"
         >
           {isPending ? "Einladung wird verschickt…" : "Einladen"}
         </button>
@@ -608,15 +608,15 @@ function ModalShell({
       onClick={onClose}
     >
       <div
-        className="w-full max-w-md bg-white rounded-2xl border border-gray-100 shadow-xl p-6 space-y-4"
+        className="w-full max-w-md bg-white rounded-2xl border border-[var(--border-subtle)] shadow-xl p-6 space-y-4"
         onClick={e => e.stopPropagation()}
       >
         <div className="flex items-center justify-between">
-          <h2 className="text-base font-semibold text-[#0f172a]">{title}</h2>
+          <h2 className="text-base font-semibold text-[var(--foreground)]">{title}</h2>
           <button
             type="button"
             onClick={onClose}
-            className="text-[#94a3b8] hover:text-[#0f172a] text-lg leading-none"
+            className="text-[var(--text-faint)] hover:text-[var(--foreground)] text-lg leading-none"
           >
             ✕
           </button>
@@ -630,7 +630,7 @@ function ModalShell({
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="space-y-1.5">
-      <label className="text-xs text-[#64748b] font-medium uppercase tracking-wider">
+      <label className="text-xs text-[var(--text-muted)] font-medium uppercase tracking-wider">
         {label}
       </label>
       {children}
@@ -641,8 +641,8 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 function ReadonlyRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="space-y-1.5">
-      <p className="text-xs text-[#94a3b8] font-medium uppercase tracking-wider">{label}</p>
-      <p className="text-sm text-[#0f172a] bg-[#f8f9fb] border border-gray-100 rounded-lg px-3 py-2">
+      <p className="text-xs text-[var(--text-faint)] font-medium uppercase tracking-wider">{label}</p>
+      <p className="text-sm text-[var(--foreground)] bg-[var(--surface-muted)] border border-[var(--border-subtle)] rounded-lg px-3 py-2">
         {value}
       </p>
     </div>

@@ -80,15 +80,15 @@ export default function AuditClient({
   return (
     <div className="space-y-4">
       <header>
-        <h1 className="text-base font-semibold text-[#0f172a]">Audit-Log</h1>
-        <p className="text-xs text-[#64748b] mt-0.5">
+        <h1 className="text-base font-semibold text-[var(--foreground)]">Audit-Log</h1>
+        <p className="text-xs text-[var(--text-muted)] mt-0.5">
           Unveränderbares Protokoll aller Admin-Aktionen ·{" "}
           {totalCount} Einträge{filtered ? " (gefiltert)" : ""}
         </p>
       </header>
 
       {/* Filter pills */}
-      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 space-y-3">
+      <div className="bg-white rounded-xl border border-[var(--border-subtle)] shadow-sm p-4 space-y-3">
         <FilterRow label="Aktion">
           {ACTION_FILTERS.map(f => (
             <FilterPill
@@ -125,27 +125,27 @@ export default function AuditClient({
       </div>
 
       {loadError && (
-        <div className="rounded-lg bg-red-50 border border-red-100 px-4 py-3">
-          <p className="text-xs text-red-600 font-medium">{loadError}</p>
+        <div className="rounded-lg bg-[var(--danger-soft)] border border-[var(--danger)]/20 px-4 py-3">
+          <p className="text-xs text-[var(--danger)] font-medium">{loadError}</p>
         </div>
       )}
 
       {/* Audit table */}
-      <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+      <div className="bg-white rounded-xl border border-[var(--border-subtle)] shadow-sm overflow-hidden">
         <table className="w-full text-sm">
-          <thead className="bg-[#f8f9fb] border-b border-gray-100">
+          <thead className="bg-[var(--surface-muted)] border-b border-[var(--border-subtle)]">
             <tr>
-              <th className="text-left px-4 py-3 text-xs font-semibold text-[#64748b] uppercase tracking-wider">Wann</th>
-              <th className="text-left px-4 py-3 text-xs font-semibold text-[#64748b] uppercase tracking-wider">Actor</th>
-              <th className="text-left px-4 py-3 text-xs font-semibold text-[#64748b] uppercase tracking-wider">Aktion</th>
-              <th className="text-left px-4 py-3 text-xs font-semibold text-[#64748b] uppercase tracking-wider">Ziel</th>
-              <th className="text-right px-4 py-3 text-xs font-semibold text-[#64748b] uppercase tracking-wider"></th>
+              <th className="text-left px-4 py-3 text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider">Wann</th>
+              <th className="text-left px-4 py-3 text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider">Actor</th>
+              <th className="text-left px-4 py-3 text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider">Aktion</th>
+              <th className="text-left px-4 py-3 text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider">Ziel</th>
+              <th className="text-right px-4 py-3 text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider"></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
             {entries.length === 0 && (
               <tr>
-                <td colSpan={5} className="text-center py-12 text-[#94a3b8] text-sm">
+                <td colSpan={5} className="text-center py-12 text-[var(--text-faint)] text-sm">
                   Keine Audit-Einträge gefunden.
                 </td>
               </tr>
@@ -155,12 +155,12 @@ export default function AuditClient({
               const open = openPayloadId === e.id
               return (
                 <Fragment key={e.id}>
-                  <tr className="hover:bg-gray-50 transition-colors">
-                    <td className="px-4 py-3 text-xs text-[#64748b] whitespace-nowrap">
+                  <tr className="hover:bg-[var(--surface-muted)] transition-colors">
+                    <td className="px-4 py-3 text-xs text-[var(--text-muted)] whitespace-nowrap">
                       {new Date(e.created_at).toLocaleString("de-DE", { dateStyle: "short", timeStyle: "medium" })}
                     </td>
-                    <td className="px-4 py-3 text-xs text-[#0f172a]">
-                      {e.actor_email ?? <span className="text-[#94a3b8]">—</span>}
+                    <td className="px-4 py-3 text-xs text-[var(--foreground)]">
+                      {e.actor_email ?? <span className="text-[var(--text-faint)]">—</span>}
                     </td>
                     <td className="px-4 py-3">
                       <ActionBadge action={e.action as AuditActionName} />
@@ -173,7 +173,7 @@ export default function AuditClient({
                         <button
                           type="button"
                           onClick={() => setOpenPayloadId(open ? null : e.id)}
-                          className="text-xs px-2.5 py-1 rounded-lg border border-gray-200 text-[#64748b] hover:border-[#4F6EF7] hover:text-[#4F6EF7] transition-colors"
+                          className="text-xs px-2.5 py-1 rounded-lg border border-[var(--border-subtle)] text-[var(--text-muted)] hover:border-[var(--accent)] hover:text-[var(--accent)] transition-colors"
                         >
                           {open ? "Hide" : "Payload"}
                         </button>
@@ -181,9 +181,9 @@ export default function AuditClient({
                     </td>
                   </tr>
                   {open && payloadStr && (
-                    <tr className="bg-[#f8f9fb]">
+                    <tr className="bg-[var(--surface-muted)]">
                       <td colSpan={5} className="px-4 py-3">
-                        <pre className="text-[10px] text-[#0f172a] bg-white border border-gray-100 rounded p-3 overflow-x-auto max-h-64 overflow-y-auto">
+                        <pre className="text-[10px] text-[var(--foreground)] bg-white border border-[var(--border-subtle)] rounded p-3 overflow-x-auto max-h-64 overflow-y-auto">
                           {payloadStr}
                         </pre>
                       </td>
@@ -202,17 +202,17 @@ export default function AuditClient({
           <button
             onClick={() => navigate({ page: String(page - 1) })}
             disabled={page <= 1}
-            className="text-sm px-4 py-2 rounded-lg border border-gray-200 text-[#64748b] hover:bg-gray-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            className="text-sm px-4 py-2 rounded-lg border border-[var(--border-subtle)] text-[var(--text-muted)] hover:bg-[var(--surface-muted)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
             ← Zurück
           </button>
-          <span className="text-sm text-[#64748b]">
+          <span className="text-sm text-[var(--text-muted)]">
             Seite {page} von {totalPages}
           </span>
           <button
             onClick={() => navigate({ page: String(page + 1) })}
             disabled={page >= totalPages}
-            className="text-sm px-4 py-2 rounded-lg border border-gray-200 text-[#64748b] hover:bg-gray-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            className="text-sm px-4 py-2 rounded-lg border border-[var(--border-subtle)] text-[var(--text-muted)] hover:bg-[var(--surface-muted)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
             Weiter →
           </button>
@@ -224,13 +224,13 @@ export default function AuditClient({
 
 function renderTarget(e: AuditEntry) {
   if (!e.target_type || !e.target_id) {
-    return <span className="text-[#94a3b8]">—</span>
+    return <span className="text-[var(--text-faint)]">—</span>
   }
   if (e.target_type === "user") {
     return (
       <Link
         href={`/dashboard/users/${e.target_id}`}
-        className="text-[#4F6EF7] hover:underline"
+        className="text-[var(--accent)] hover:underline"
       >
         user / {e.target_id.slice(0, 8)}…
       </Link>
@@ -247,7 +247,7 @@ function renderTarget(e: AuditEntry) {
       return (
         <Link
           href={`/dashboard/users/${profileId}`}
-          className="text-[#4F6EF7] hover:underline"
+          className="text-[var(--accent)] hover:underline"
         >
           schedule / {e.target_id.slice(0, 8)}…
         </Link>
@@ -262,10 +262,10 @@ function ActionBadge({ action }: { action: AuditActionName }) {
   // Color by family
   const family = action.split(".")[0]
   const styles: Record<string, string> = {
-    user:     "bg-blue-50 text-[#4F6EF7] border-blue-100",
+    user:     "bg-[var(--accent-soft)] text-[var(--accent)] border-[var(--accent)]/20",
     schedule: "bg-amber-50 text-amber-700 border-amber-100",
   }
-  const cls = styles[family] ?? "bg-gray-100 text-[#64748b] border-gray-200"
+  const cls = styles[family] ?? "bg-[var(--surface-sunken)] text-[var(--text-muted)] border-[var(--border-subtle)]"
   return (
     <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full border font-medium ${cls}`}>
       {ACTION_LABEL[action] ?? action}
@@ -277,7 +277,7 @@ function ActionBadge({ action }: { action: AuditActionName }) {
 function FilterRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <span className="text-xs uppercase tracking-wider font-semibold text-[#94a3b8] w-20">{label}</span>
+      <span className="text-xs uppercase tracking-wider font-semibold text-[var(--text-faint)] w-20">{label}</span>
       {children}
     </div>
   )
@@ -298,8 +298,8 @@ function FilterPill({
       onClick={onClick}
       className={`text-xs px-3 py-1.5 rounded-lg border transition-colors ${
         active
-          ? "bg-[#4F6EF7] text-white border-[#4F6EF7]"
-          : "bg-white text-[#64748b] border-gray-200 hover:border-[#4F6EF7] hover:text-[#4F6EF7]"
+          ? "bg-[var(--accent)] text-white border-[var(--accent)]"
+          : "bg-white text-[var(--text-muted)] border-[var(--border-subtle)] hover:border-[var(--accent)] hover:text-[var(--accent)]"
       }`}
     >
       {children}
