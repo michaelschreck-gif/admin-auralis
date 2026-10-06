@@ -214,6 +214,14 @@ export async function getProfileByEmail(email: string) {
     .maybeSingle()
 }
 
+export async function searchProfiles(query: string, limit = 10): Promise<Profile[]> {
+  const q = query.replace(/[%,()]/g, " ").trim()
+  let req = adminClient().from("profiles").select("*").order("created_at", { ascending: false }).limit(limit)
+  if (q) req = req.or(`email.ilike.%${q}%,full_name.ilike.%${q}%`)
+  const { data } = await req
+  return data ?? []
+}
+
 export async function getProfilesByIds(ids: string[]): Promise<Profile[]> {
   if (ids.length === 0) return []
   const { data } = await adminClient().from("profiles").select("*").in("id", ids)

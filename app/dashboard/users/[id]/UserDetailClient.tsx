@@ -13,7 +13,7 @@ import {
   actionUpdateScheduleFrequency,
   actionToggleSchedule,
   actionDeleteUser,
-} from "@/app/dashboard/actions"
+} from "@/app/dashboard/api"
 import { SetPasswordModal, btnSmall } from "@/app/dashboard/ui"
 
 const FREQUENCIES: { value: FrequencyType; label: string }[] = [

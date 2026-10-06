@@ -5,9 +5,9 @@ import { useRouter } from "next/navigation"
 import { useState, useTransition } from "react"
 import type { TeamRow, LanguageType } from "@/lib/supabase/admin"
 import { validatePassword } from "@/lib/accounts"
-import { actionCreateTeam } from "../actions"
+import { actionCreateTeam } from "../api"
 import {
-  ModalShell, Field, PasswordField, ErrorBox, extractError,
+  ModalShell, Field, PasswordField, ErrorBox, UserPicker, extractError,
   inputCls, btnPrimary, btnGhost,
 } from "../ui"
 
@@ -100,36 +100,66 @@ export default function TeamsClient({
 
 function CreateTeamModal({ onClose }: { onClose: () => void }) {
   const router = useRouter()
+  const [mode, setMode] = useState<"existing" | "new">("existing")
   const [teamName, setTeamName] = useState("")
   const [ownerEmail, setOwnerEmail] = useState("")
   const [password, setPassword] = useState("")
+  const [ownerId, setOwnerId] = useState<string[]>([])
   const [language, setLanguage] = useState<LanguageType>("de")
   const [error, setError] = useState<string | null>(null)
-  const [created, setCreated] = useState<{ id: string; email: string; password: string } | null>(null)
+  const [created, setCreated] = useState<{ id: string; email?: string; password?: string } | null>(null)
   const [isPending, startTransition] = useTransition()
 
   function save() {
-    const v = validatePassword(password)
-    if (v) { setError(v); return }
+    if (mode === "new") {
+      const v = validatePassword(password)
+      if (v) { setError(v); return }
+    }
     setError(null)
     startTransition(async () => {
       try {
-        const res = await actionCreateTeam({ teamName, ownerEmail, password, language })
-        setCreated({ id: res.id, email: ownerEmail.trim().toLowerCase(), password })
+        const res = await actionCreateTeam(
+          mode === "new"
+            ? { language, owner: { mode: "new", teamName, email: ownerEmail, password } }
+            : { language, owner: { mode: "existing", userId: ownerId[0] } },
+        )
+        setCreated(mode === "new"
+          ? { id: res.id, email: ownerEmail.trim().toLowerCase(), password }
+          : { id: res.id })
       } catch (e) {
         setError(extractError(e))
       }
     })
   }
 
+  const tab = (m: "existing" | "new", label: string) => (
+    <button
+      type="button"
+      onClick={() => { setMode(m); setError(null) }}
+      className={`flex-1 text-sm px-3 py-2 rounded-lg border transition-colors ${
+        mode === m
+          ? "bg-[var(--accent)] text-white border-[var(--accent)]"
+          : "bg-white text-[var(--text-muted)] border-[var(--border-subtle)] hover:border-[var(--accent)]"
+      }`}
+    >
+      {label}
+    </button>
+  )
+
   return (
     <ModalShell onClose={onClose} title="Team anlegen">
       {created ? (
         <>
           <div className="rounded-lg bg-green-50 border border-green-100 px-4 py-3 space-y-1">
-            <p className="text-xs text-green-700 font-medium">Team angelegt. Zugangsdaten des Inhabers, werden nicht noch einmal angezeigt:</p>
-            <p className="text-sm text-green-800 break-all">{created.email}</p>
-            <p className="text-sm font-mono text-green-800 select-all break-all">{created.password}</p>
+            {created.password ? (
+              <>
+                <p className="text-xs text-green-700 font-medium">Team angelegt. Zugangsdaten des Inhabers, werden nicht noch einmal angezeigt:</p>
+                <p className="text-sm text-green-800 break-all">{created.email}</p>
+                <p className="text-sm font-mono text-green-800 select-all break-all">{created.password}</p>
+              </>
+            ) : (
+              <p className="text-xs text-green-700 font-medium">Team angelegt. Der gewählte Nutzer ist jetzt Inhaber (Tarif Enterprise), sein Passwort bleibt unverändert.</p>
+            )}
           </div>
           <div className="flex justify-end gap-2 pt-2">
             <button type="button" onClick={onClose} className={btnGhost}>Schließen</button>
@@ -141,30 +171,58 @@ function CreateTeamModal({ onClose }: { onClose: () => void }) {
       ) : (
         <>
           <p className="text-xs text-[var(--text-muted)]">
-            Ein Team besteht aus einem Inhaber (Enterprise-Konto mit Login) und beliebig vielen Mitgliedern, die du danach anlegst.
+            Ein Team besteht aus einem Inhaber (Enterprise-Konto) und beliebig vielen Mitgliedern, die du danach hinzufügst.
           </p>
-          <Field label="Teamname / Firma">
-            <input type="text" value={teamName} onChange={e => setTeamName(e.target.value)} placeholder="z.B. Muster GmbH" autoFocus className={inputCls} />
-          </Field>
-          <Field label="E-Mail des Inhabers">
-            <input type="email" value={ownerEmail} onChange={e => setOwnerEmail(e.target.value)} placeholder="inhaber@firma.de" className={inputCls} />
-          </Field>
-          <PasswordField value={password} onChange={setPassword} hint="Mindestens 10 Zeichen." />
-          <Field label="Sprache">
-            <select value={language} onChange={e => setLanguage(e.target.value as LanguageType)} className={inputCls}>
-              <option value="de">Deutsch</option>
-              <option value="en">English</option>
-              <option value="fr">Français</option>
-              <option value="es">Español</option>
-              <option value="it">Italiano</option>
-              <option value="nl">Nederlands</option>
-              <option value="pt">Português</option>
-            </select>
-          </Field>
+          <div className="flex gap-2">
+            {tab("existing", "Bestehenden Nutzer wählen")}
+            {tab("new", "Neues Konto anlegen")}
+          </div>
+
+          {mode === "existing" ? (
+            <Field label="Inhaber" hint="Der gewählte Nutzer wird auf Enterprise gestellt, sein Teamname ist sein Name (später änderbar).">
+              <UserPicker
+                mode="single"
+                selected={ownerId}
+                onChange={setOwnerId}
+                disabledReason={u => (u.parent_account_id ? `Mitglied in ${u.teamName}` : null)}
+                noteFor={u => (u.memberCount > 0 ? `Team · ${u.memberCount}` : u.plan === "enterprise" ? "Enterprise" : null)}
+              />
+            </Field>
+          ) : (
+            <>
+              <Field label="Teamname / Firma">
+                <input type="text" value={teamName} onChange={e => setTeamName(e.target.value)} placeholder="z.B. Muster GmbH" autoFocus className={inputCls} />
+              </Field>
+              <Field label="E-Mail des Inhabers">
+                <input type="email" value={ownerEmail} onChange={e => setOwnerEmail(e.target.value)} placeholder="inhaber@firma.de" className={inputCls} />
+              </Field>
+              <PasswordField value={password} onChange={setPassword} hint="Mindestens 10 Zeichen." />
+              <Field label="Sprache">
+                <select value={language} onChange={e => setLanguage(e.target.value as LanguageType)} className={inputCls}>
+                  <option value="de">Deutsch</option>
+                  <option value="en">English</option>
+                  <option value="fr">Français</option>
+                  <option value="es">Español</option>
+                  <option value="it">Italiano</option>
+                  <option value="nl">Nederlands</option>
+                  <option value="pt">Português</option>
+                </select>
+              </Field>
+            </>
+          )}
+
           {error && <ErrorBox>{error}</ErrorBox>}
           <div className="flex items-center justify-end gap-2 pt-2">
             <button type="button" onClick={onClose} disabled={isPending} className={btnGhost}>Abbrechen</button>
-            <button type="button" onClick={save} disabled={isPending || !teamName.trim() || !ownerEmail.trim() || !password} className={btnPrimary}>
+            <button
+              type="button"
+              onClick={save}
+              disabled={
+                isPending ||
+                (mode === "existing" ? ownerId.length === 0 : !teamName.trim() || !ownerEmail.trim() || !password)
+              }
+              className={btnPrimary}
+            >
               {isPending ? "Legt an…" : "Team anlegen"}
             </button>
           </div>

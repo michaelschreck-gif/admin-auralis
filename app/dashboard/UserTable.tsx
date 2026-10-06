@@ -14,7 +14,7 @@ import {
   actionUnbanUser,
   actionDeleteUser,
   actionInviteUser,
-} from "./actions"
+} from "./api"
 
 const PLANS = ["free", "starter", "pro", "enterprise"] as const satisfies readonly PlanType[]
 const LANGUAGES: { code: LanguageType; label: string; flag: string }[] = [

@@ -8,15 +8,15 @@ import { validatePassword } from "@/lib/accounts"
 import {
   actionRenameTeam,
   actionCreateTeamMember,
-  actionAddExistingToTeam,
+  actionAddUsersToTeam,
   actionRemoveFromTeam,
   actionDeleteUser,
   actionDeleteTeam,
   actionBanUser,
   actionUnbanUser,
-} from "@/app/dashboard/actions"
+} from "@/app/dashboard/api"
 import {
-  ModalShell, Field, PasswordField, SetPasswordModal, ErrorBox, extractError,
+  ModalShell, Field, PasswordField, SetPasswordModal, ErrorBox, UserPicker, extractError,
   inputCls, btnPrimary, btnGhost, btnSmall,
 } from "@/app/dashboard/ui"
 
@@ -100,7 +100,7 @@ export default function TeamDetailClient({
             <h2 className="text-sm font-semibold text-[var(--foreground)]">Mitglieder</h2>
             <p className="text-xs text-[var(--text-muted)] mt-0.5">{members.length} im Team</p>
           </div>
-          <button type="button" onClick={() => setExistingOpen(true)} className={btnSmall}>Bestehendes Konto hinzufügen</button>
+          <button type="button" onClick={() => setExistingOpen(true)} className={btnSmall}>Bestehende Konten hinzufügen</button>
           <button type="button" onClick={() => setAddOpen(true)} className={btnPrimary}>+ Mitglied anlegen</button>
         </header>
 
@@ -194,7 +194,7 @@ export default function TeamDetailClient({
         <AddMemberModal teamId={owner.id} onClose={() => { setAddOpen(false); router.refresh() }} />
       )}
       {existingOpen && (
-        <AddExistingModal teamId={owner.id} onClose={() => { setExistingOpen(false); router.refresh() }} />
+        <AddExistingModal teamId={owner.id} memberIds={members.map(m => m.id)} onClose={() => { setExistingOpen(false); router.refresh() }} />
       )}
       {deleteTeamOpen && (
         <DeleteTeamModal
@@ -285,18 +285,26 @@ function AddMemberModal({ teamId, onClose }: { teamId: string; onClose: () => vo
   )
 }
 
-function AddExistingModal({ teamId, onClose }: { teamId: string; onClose: () => void }) {
-  const [email, setEmail] = useState("")
+function AddExistingModal({
+  teamId,
+  memberIds,
+  onClose,
+}: {
+  teamId: string
+  memberIds: string[]
+  onClose: () => void
+}) {
+  const [selected, setSelected] = useState<string[]>([])
   const [error, setError] = useState<string | null>(null)
-  const [done, setDone] = useState(false)
+  const [added, setAdded] = useState<number | null>(null)
   const [isPending, startTransition] = useTransition()
 
   function save() {
     setError(null)
     startTransition(async () => {
       try {
-        await actionAddExistingToTeam(teamId, email)
-        setDone(true)
+        const res = await actionAddUsersToTeam(teamId, selected)
+        setAdded(res.added)
       } catch (e) {
         setError(extractError(e))
       }
@@ -304,23 +312,32 @@ function AddExistingModal({ teamId, onClose }: { teamId: string; onClose: () => 
   }
 
   return (
-    <ModalShell onClose={onClose} title="Bestehendes Konto hinzufügen">
-      {done ? (
+    <ModalShell onClose={onClose} title="Bestehende Konten hinzufügen">
+      {added !== null ? (
         <>
-          <p className="text-sm text-green-700">Konto wurde dem Team zugeordnet.</p>
+          <p className="text-sm text-green-700">{added} {added === 1 ? "Konto wurde" : "Konten wurden"} dem Team zugeordnet.</p>
           <div className="flex justify-end pt-2"><button type="button" onClick={onClose} className={btnPrimary}>Fertig</button></div>
         </>
       ) : (
         <>
-          <p className="text-xs text-[var(--text-muted)]">Ordnet eine bereits registrierte Einzelperson per E-Mail diesem Team zu.</p>
-          <Field label="E-Mail des Kontos">
-            <input type="email" value={email} onChange={e => setEmail(e.target.value)} autoFocus className={inputCls} />
-          </Field>
+          <p className="text-xs text-[var(--text-muted)]">Wähle eine oder mehrere bereits registrierte Personen aus.</p>
+          <UserPicker
+            mode="multi"
+            selected={selected}
+            onChange={setSelected}
+            disabledReason={u =>
+              u.id === teamId ? "Inhaber"
+              : memberIds.includes(u.id) ? "Schon im Team"
+              : u.is_admin ? "Admin"
+              : u.memberCount > 0 ? "Eigenes Team"
+              : null}
+            noteFor={u => (u.parent_account_id ? `wechselt von ${u.teamName}` : null)}
+          />
           {error && <ErrorBox>{error}</ErrorBox>}
           <div className="flex items-center justify-end gap-2 pt-2">
             <button type="button" onClick={onClose} disabled={isPending} className={btnGhost}>Abbrechen</button>
-            <button type="button" onClick={save} disabled={isPending || !email.trim()} className={btnPrimary}>
-              {isPending ? "Sucht…" : "Hinzufügen"}
+            <button type="button" onClick={save} disabled={isPending || selected.length === 0} className={btnPrimary}>
+              {isPending ? "Fügt hinzu…" : `Hinzufügen (${selected.length})`}
             </button>
           </div>
         </>

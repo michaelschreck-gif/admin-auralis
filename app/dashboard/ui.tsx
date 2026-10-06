@@ -1,7 +1,8 @@
 "use client"
 
-import { useState, useTransition } from "react"
-import { actionSetPassword } from "./actions"
+import { useEffect, useState, useTransition } from "react"
+import { actionSetPassword, actionSearchUsers } from "./api"
+import type { PickerUser } from "./actions"
 import { generatePassword, validatePassword } from "@/lib/accounts"
 
 export const inputCls =
@@ -201,5 +202,113 @@ export function SetPasswordModal({
         </>
       )}
     </ModalShell>
+  )
+}
+
+/**
+ * Suchliste für bestehende Nutzer. `disabledReason` liefert pro Person einen
+ * Grund, warum sie nicht wählbar ist (oder null).
+ */
+export function UserPicker({
+  mode,
+  selected,
+  onChange,
+  disabledReason,
+  noteFor,
+}: {
+  mode: "single" | "multi"
+  selected: string[]
+  onChange: (ids: string[]) => void
+  disabledReason: (u: PickerUser) => string | null
+  noteFor?: (u: PickerUser) => string | null
+}) {
+  const [query, setQuery] = useState("")
+  const [results, setResults] = useState<PickerUser[]>([])
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [known, setKnown] = useState<Record<string, PickerUser>>({})
+
+  useEffect(() => {
+    let cancelled = false
+    setLoading(true)
+    const t = setTimeout(async () => {
+      try {
+        const r = await actionSearchUsers(query)
+        if (cancelled) return
+        setResults(r)
+        setKnown(k => ({ ...k, ...Object.fromEntries(r.map(u => [u.id, u])) }))
+        setError(null)
+      } catch (e) {
+        if (!cancelled) setError(extractError(e))
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }, 250)
+    return () => { cancelled = true; clearTimeout(t) }
+  }, [query])
+
+  function toggle(id: string) {
+    if (mode === "single") onChange(selected[0] === id ? [] : [id])
+    else onChange(selected.includes(id) ? selected.filter(x => x !== id) : [...selected, id])
+  }
+
+  return (
+    <div className="space-y-2">
+      <input
+        type="text"
+        value={query}
+        onChange={e => setQuery(e.target.value)}
+        placeholder="Name oder E-Mail suchen…"
+        className={inputCls}
+      />
+      {selected.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {selected.map(id => {
+            const u = known[id]
+            return (
+              <button
+                key={id}
+                type="button"
+                onClick={() => toggle(id)}
+                className="text-xs px-2 py-1 rounded-full bg-[var(--accent-soft)] text-[var(--accent)] border border-[var(--accent)]/20"
+                title="Auswahl entfernen"
+              >
+                {u ? (u.full_name || u.email) : id.slice(0, 8)} ✕
+              </button>
+            )
+          })}
+        </div>
+      )}
+      <div className="border border-[var(--border-subtle)] rounded-lg max-h-56 overflow-y-auto divide-y divide-gray-50">
+        {error && <p className="p-3 text-xs text-[var(--danger)]">{error}</p>}
+        {!error && results.length === 0 && (
+          <p className="p-3 text-xs text-[var(--text-faint)]">{loading ? "Sucht…" : "Keine Treffer."}</p>
+        )}
+        {results.map(u => {
+          const reason = disabledReason(u)
+          const note = reason ?? noteFor?.(u) ?? null
+          const checked = selected.includes(u.id)
+          return (
+            <label
+              key={u.id}
+              className={`flex items-center gap-3 px-3 py-2 text-sm ${reason ? "opacity-50 cursor-not-allowed" : "cursor-pointer hover:bg-[var(--surface-muted)]"}`}
+            >
+              <input
+                type={mode === "single" ? "radio" : "checkbox"}
+                checked={checked}
+                disabled={!!reason}
+                onChange={() => toggle(u.id)}
+                className="accent-[var(--accent)]"
+              />
+              <span className="flex-1 min-w-0">
+                <span className="block truncate text-[var(--foreground)]">{u.full_name || "—"}</span>
+                <span className="block truncate text-xs text-[var(--text-muted)]">{u.email}</span>
+              </span>
+              {note && <span className="text-xs text-[var(--text-faint)] text-right">{note}</span>}
+            </label>
+          )
+        })}
+      </div>
+    </div>
   )
 }

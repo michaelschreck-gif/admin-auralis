@@ -11,8 +11,10 @@ import {
   createAccount,
   setUserPassword,
   setUserParent,
-  getProfileByEmail,
   getProfilesByIds,
+  searchProfiles,
+  getTeamInfoFor,
+  updateUserPlan as setPlan,
   getTeamMembers,
   updateSchedule,
   logAudit,
@@ -24,6 +26,26 @@ import { EMAIL_RE, validatePassword } from "@/lib/accounts"
 import { createClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
+
+
+type ActionResult<T> = { ok: true; data: T } | { ok: false; error: string }
+
+/**
+ * In Produktion maskiert Next.js die Meldung geworfener Fehler aus Server
+ * Actions ("An error occurred in the Server Components render…"). Deshalb
+ * geben alle Actions ein Ergebnisobjekt zurück; app/dashboard/api.ts wirft
+ * daraus clientseitig wieder einen Error mit der echten Meldung.
+ */
+async function guard<T>(fn: () => Promise<T>): Promise<ActionResult<T>> {
+  try {
+    return { ok: true, data: await fn() }
+  } catch (e) {
+    const digest = (e as { digest?: unknown } | null)?.digest
+    if (typeof digest === "string" && digest.startsWith("NEXT_")) throw e // redirect / notFound
+    console.error("[admin action]", e)
+    return { ok: false, error: e instanceof Error ? e.message : "Unbekannter Fehler." }
+  }
+}
 
 type ActorContext = { id: string; email: string | null }
 
@@ -43,7 +65,7 @@ async function requireAdmin(): Promise<ActorContext> {
   return { id: user.id, email: profile.email ?? user.email ?? null }
 }
 
-export async function actionUpdatePlan(userId: string, plan: PlanType) {
+async function impl_actionUpdatePlan(userId: string, plan: PlanType) {
   const actor = await requireAdmin()
   const { error } = await updateUserPlan(userId, plan)
   if (error) throw new Error(error.message)
@@ -55,7 +77,7 @@ export async function actionUpdatePlan(userId: string, plan: PlanType) {
   revalidatePath("/dashboard")
 }
 
-export async function actionUpdateProfile(
+async function impl_actionUpdateProfile(
   userId: string,
   patch: {
     full_name?: string | null
@@ -89,7 +111,7 @@ export async function actionUpdateProfile(
   revalidatePath(`/dashboard/users/${userId}`)
 }
 
-export async function actionBanUser(userId: string) {
+async function impl_actionBanUser(userId: string) {
   const actor = await requireAdmin()
   if (userId === actor.id) {
     throw new Error("Du kannst dich nicht selbst sperren.")
@@ -104,7 +126,7 @@ export async function actionBanUser(userId: string) {
   revalidatePath(`/dashboard/users/${userId}`)
 }
 
-export async function actionUnbanUser(userId: string) {
+async function impl_actionUnbanUser(userId: string) {
   const actor = await requireAdmin()
   const { error } = await unbanUser(userId)
   if (error) throw new Error(error.message)
@@ -116,7 +138,7 @@ export async function actionUnbanUser(userId: string) {
   revalidatePath(`/dashboard/users/${userId}`)
 }
 
-export async function actionDeleteUser(userId: string) {
+async function impl_actionDeleteUser(userId: string) {
   const actor = await requireAdmin()
   if (userId === actor.id) {
     throw new Error("Du kannst dich nicht selbst löschen.")
@@ -140,7 +162,7 @@ export async function actionDeleteUser(userId: string) {
  * After the user signs up, the `handle_new_user` trigger automatically
  * creates the `profiles` row.
  */
-export async function actionInviteUser(email: string) {
+async function impl_actionInviteUser(email: string) {
   const actor = await requireAdmin()
   const trimmed = email.trim().toLowerCase()
   if (!trimmed) throw new Error("E-Mail darf nicht leer sein.")
@@ -172,7 +194,7 @@ export async function actionSignOut() {
  * Schedule (Topic) actions – used on user detail page
  * ───────────────────────────────────────────────────────── */
 
-export async function actionUpdateScheduleFrequency(
+async function impl_actionUpdateScheduleFrequency(
   scheduleId: string,
   frequency: FrequencyType,
   profileId: string,
@@ -188,7 +210,7 @@ export async function actionUpdateScheduleFrequency(
   revalidatePath(`/dashboard/users/${profileId}`)
 }
 
-export async function actionToggleSchedule(
+async function impl_actionToggleSchedule(
   scheduleId: string,
   isActive: boolean,
   profileId: string,
@@ -232,7 +254,7 @@ function cleanPassword(raw: string | undefined): string | undefined {
 }
 
 /** Legt einen Einzelnutzer direkt an (mit Passwort, ohne Einladungs-Mail). */
-export async function actionCreateUser(input: {
+async function impl_actionCreateUser(input: {
   email: string
   fullName: string
   password: string
@@ -264,7 +286,7 @@ export async function actionCreateUser(input: {
 }
 
 /** Setzt für ein beliebiges Konto direkt ein neues Passwort. */
-export async function actionSetPassword(userId: string, password: string) {
+async function impl_actionSetPassword(userId: string, password: string) {
   const actor = await requireAdmin()
   const err = validatePassword(password)
   if (err) throw new Error(err)
@@ -276,17 +298,39 @@ export async function actionSetPassword(userId: string, password: string) {
   })
 }
 
-/** Legt ein Team an: Enterprise-Konto als Inhaber, mit Login. */
-export async function actionCreateTeam(input: {
-  teamName: string
-  ownerEmail: string
-  password: string
+/**
+ * Legt ein Team an. Inhaber ist entweder ein neues Konto (mit Passwort) oder
+ * ein bestehender Nutzer, der dabei auf Enterprise gestellt wird.
+ */
+async function impl_actionCreateTeam(input: {
   language: LanguageType
+  owner:
+    | { mode: "new"; teamName: string; email: string; password: string }
+    | { mode: "existing"; userId: string }
 }) {
   const actor = await requireAdmin()
-  const teamName = cleanName(input.teamName, "Teamname")
-  const email = cleanEmail(input.ownerEmail)
-  const password = cleanPassword(input.password)
+
+  if (input.owner.mode === "existing") {
+    const [person] = await getProfilesByIds([input.owner.userId])
+    if (!person) throw new Error("Nutzer nicht gefunden.")
+    if (person.parent_account_id) {
+      throw new Error("Dieser Nutzer ist bereits Mitglied eines Teams und kann nicht Inhaber sein.")
+    }
+    const { error } = await setPlan(person.id, "enterprise")
+    if (error) throw new Error(error.message)
+    await logAudit(actor.id, actor.email, "team.create", {
+      targetType: "team",
+      targetId: person.id,
+      payload: { name: person.full_name, owner_email: person.email, existing_user: true },
+    })
+    revalidatePath("/dashboard/teams")
+    revalidatePath("/dashboard")
+    return { id: person.id }
+  }
+
+  const teamName = cleanName(input.owner.teamName, "Teamname")
+  const email = cleanEmail(input.owner.email)
+  const password = cleanPassword(input.owner.password)
   if (!password) throw new Error("Bitte ein Passwort für den Team-Inhaber vergeben.")
 
   const res = await createAccount({
@@ -306,7 +350,35 @@ export async function actionCreateTeam(input: {
   return { id: res.id }
 }
 
-export async function actionRenameTeam(teamId: string, name: string) {
+export type PickerUser = {
+  id: string
+  email: string
+  full_name: string | null
+  plan: PlanType
+  is_admin: boolean
+  parent_account_id: string | null
+  teamName: string | null
+  memberCount: number
+}
+
+/** Nutzersuche für die Auswahllisten (Name oder E-Mail). */
+async function impl_actionSearchUsers(query: string): Promise<PickerUser[]> {
+  await requireAdmin()
+  const people = await searchProfiles(query, 10)
+  const info = await getTeamInfoFor(people)
+  return people.map(p => ({
+    id: p.id,
+    email: p.email,
+    full_name: p.full_name,
+    plan: p.plan,
+    is_admin: p.is_admin,
+    parent_account_id: p.parent_account_id,
+    teamName: p.parent_account_id ? info.teamNameById[p.parent_account_id] ?? "Team" : null,
+    memberCount: info.memberCountByOwner[p.id] ?? 0,
+  }))
+}
+
+async function impl_actionRenameTeam(teamId: string, name: string) {
   const actor = await requireAdmin()
   const teamName = cleanName(name, "Teamname")
   const { error } = await updateUserProfile(teamId, { full_name: teamName })
@@ -325,7 +397,7 @@ export async function actionRenameTeam(teamId: string, name: string) {
  * Konto ohne eigenen Login (wie im Haupt-Tool); mit Passwort kann sich die
  * Person selbst anmelden.
  */
-export async function actionCreateTeamMember(
+async function impl_actionCreateTeamMember(
   teamId: string,
   input: { fullName: string; email: string; password?: string; language: LanguageType },
 ) {
@@ -356,40 +428,43 @@ export async function actionCreateTeamMember(
   revalidatePath("/dashboard/teams")
 }
 
-/** Hängt ein bereits bestehendes Konto (per E-Mail) an ein Team. */
-export async function actionAddExistingToTeam(teamId: string, rawEmail: string) {
+/** Ordnet bestehende Konten einem Team zu (Mehrfachauswahl). */
+async function impl_actionAddUsersToTeam(teamId: string, userIds: string[]) {
   const actor = await requireAdmin()
-  const email = cleanEmail(rawEmail)
+  if (userIds.length === 0) throw new Error("Bitte mindestens eine Person auswählen.")
   const [owner] = await getProfilesByIds([teamId])
   if (!owner) throw new Error("Team nicht gefunden.")
   if (owner.parent_account_id) throw new Error("Dieses Konto ist selbst Teammitglied.")
 
-  const { data: person } = await getProfileByEmail(email)
-  if (!person) throw new Error("Kein Konto mit dieser E-Mail gefunden.")
-  if (person.id === teamId) throw new Error("Der Inhaber gehört bereits zum Team.")
-  if (person.is_admin) throw new Error("Admin-Konten können keinem Team zugeordnet werden.")
-  if (person.parent_account_id === teamId) throw new Error("Diese Person ist bereits im Team.")
-  if (person.plan === "enterprise") {
-    const members = await getTeamMembers(person.id)
-    if (members.length > 0) {
-      throw new Error("Dieses Konto ist Inhaber eines eigenen Teams mit Mitgliedern.")
+  const people = await getProfilesByIds(userIds)
+  const info = await getTeamInfoFor(people)
+  for (const person of people) {
+    const who = person.full_name || person.email
+    if (person.id === teamId) throw new Error(`${who}: Der Inhaber gehört bereits zum Team.`)
+    if (person.is_admin) throw new Error(`${who}: Admin-Konten können keinem Team zugeordnet werden.`)
+    if (person.parent_account_id === teamId) throw new Error(`${who}: ist bereits im Team.`)
+    if ((info.memberCountByOwner[person.id] ?? 0) > 0) {
+      throw new Error(`${who}: ist Inhaber eines eigenen Teams mit Mitgliedern.`)
     }
   }
 
-  const { error } = await setUserParent(person.id, teamId)
-  if (error) throw new Error(error.message)
-  await logAudit(actor.id, actor.email, "team.member.add", {
-    targetType: "team",
-    targetId: teamId,
-    payload: { member_id: person.id, email, created: false },
-  })
+  for (const person of people) {
+    const { error } = await setUserParent(person.id, teamId)
+    if (error) throw new Error(`${person.email}: ${error.message}`)
+    await logAudit(actor.id, actor.email, "team.member.add", {
+      targetType: "team",
+      targetId: teamId,
+      payload: { member_id: person.id, email: person.email, created: false },
+    })
+  }
   revalidatePath(`/dashboard/teams/${teamId}`)
   revalidatePath("/dashboard/teams")
   revalidatePath("/dashboard")
+  return { added: people.length }
 }
 
 /** Löst die Person aus dem Team; das Konto bleibt als Einzelperson bestehen. */
-export async function actionRemoveFromTeam(userId: string, teamId: string) {
+async function impl_actionRemoveFromTeam(userId: string, teamId: string) {
   const actor = await requireAdmin()
   const { error } = await setUserParent(userId, null)
   if (error) throw new Error(error.message)
@@ -407,7 +482,7 @@ export async function actionRemoveFromTeam(userId: string, teamId: string) {
  * Löscht ein Team. withMembers=true löscht auch alle Mitglieder samt Daten,
  * sonst bleiben sie als Einzelpersonen bestehen. Der Inhaber wird immer gelöscht.
  */
-export async function actionDeleteTeam(teamId: string, withMembers: boolean) {
+async function impl_actionDeleteTeam(teamId: string, withMembers: boolean) {
   const actor = await requireAdmin()
   const members = await getTeamMembers(teamId)
   const [owner] = await getProfilesByIds([teamId])
@@ -442,4 +517,74 @@ export async function actionDeleteTeam(teamId: string, withMembers: boolean) {
   })
   revalidatePath("/dashboard/teams")
   revalidatePath("/dashboard")
+}
+
+/* ───────── Öffentliche Actions (Ergebnisobjekte) ───────── */
+
+export async function actionUpdatePlan(...args: Parameters<typeof impl_actionUpdatePlan>) {
+  return guard(() => impl_actionUpdatePlan(...args))
+}
+
+export async function actionUpdateProfile(...args: Parameters<typeof impl_actionUpdateProfile>) {
+  return guard(() => impl_actionUpdateProfile(...args))
+}
+
+export async function actionBanUser(...args: Parameters<typeof impl_actionBanUser>) {
+  return guard(() => impl_actionBanUser(...args))
+}
+
+export async function actionUnbanUser(...args: Parameters<typeof impl_actionUnbanUser>) {
+  return guard(() => impl_actionUnbanUser(...args))
+}
+
+export async function actionDeleteUser(...args: Parameters<typeof impl_actionDeleteUser>) {
+  return guard(() => impl_actionDeleteUser(...args))
+}
+
+export async function actionInviteUser(...args: Parameters<typeof impl_actionInviteUser>) {
+  return guard(() => impl_actionInviteUser(...args))
+}
+
+export async function actionUpdateScheduleFrequency(...args: Parameters<typeof impl_actionUpdateScheduleFrequency>) {
+  return guard(() => impl_actionUpdateScheduleFrequency(...args))
+}
+
+export async function actionToggleSchedule(...args: Parameters<typeof impl_actionToggleSchedule>) {
+  return guard(() => impl_actionToggleSchedule(...args))
+}
+
+export async function actionCreateUser(...args: Parameters<typeof impl_actionCreateUser>) {
+  return guard(() => impl_actionCreateUser(...args))
+}
+
+export async function actionSetPassword(...args: Parameters<typeof impl_actionSetPassword>) {
+  return guard(() => impl_actionSetPassword(...args))
+}
+
+export async function actionCreateTeam(...args: Parameters<typeof impl_actionCreateTeam>) {
+  return guard(() => impl_actionCreateTeam(...args))
+}
+
+export async function actionRenameTeam(...args: Parameters<typeof impl_actionRenameTeam>) {
+  return guard(() => impl_actionRenameTeam(...args))
+}
+
+export async function actionCreateTeamMember(...args: Parameters<typeof impl_actionCreateTeamMember>) {
+  return guard(() => impl_actionCreateTeamMember(...args))
+}
+
+export async function actionAddUsersToTeam(...args: Parameters<typeof impl_actionAddUsersToTeam>) {
+  return guard(() => impl_actionAddUsersToTeam(...args))
+}
+
+export async function actionSearchUsers(...args: Parameters<typeof impl_actionSearchUsers>) {
+  return guard(() => impl_actionSearchUsers(...args))
+}
+
+export async function actionRemoveFromTeam(...args: Parameters<typeof impl_actionRemoveFromTeam>) {
+  return guard(() => impl_actionRemoveFromTeam(...args))
+}
+
+export async function actionDeleteTeam(...args: Parameters<typeof impl_actionDeleteTeam>) {
+  return guard(() => impl_actionDeleteTeam(...args))
 }
