@@ -12,6 +12,13 @@ const ACTION_LABEL: Record<AuditActionName, string> = {
   "user.ban":                  "User gesperrt",
   "user.unban":                "User entsperrt",
   "user.delete":               "User gelöscht",
+  "user.create":               "User angelegt",
+  "user.password.set":         "Passwort gesetzt",
+  "team.create":               "Team angelegt",
+  "team.rename":               "Team umbenannt",
+  "team.delete":               "Team gelöscht",
+  "team.member.add":           "Mitglied hinzugefügt",
+  "team.member.remove":        "Mitglied entfernt",
   "schedule.frequency.update": "Topic-Frequency geändert",
   "schedule.toggle":           "Topic aktiviert/deaktiviert",
   "schedule.analyze.manual":   "Analyse manuell getriggert",
@@ -25,6 +32,13 @@ const ACTION_FILTERS: { value: AuditActionName | "all"; label: string }[] = [
   { value: "user.ban",                     label: "Ban" },
   { value: "user.unban",                   label: "Unban" },
   { value: "user.delete",                  label: "Delete" },
+  { value: "user.create",                  label: "User anlegen" },
+  { value: "user.password.set",            label: "Passwort setzen" },
+  { value: "team.create",                  label: "Team anlegen" },
+  { value: "team.rename",                  label: "Team umbenennen" },
+  { value: "team.delete",                  label: "Team löschen" },
+  { value: "team.member.add",              label: "Mitglied hinzufügen" },
+  { value: "team.member.remove",           label: "Mitglied entfernen" },
   { value: "schedule.frequency.update",    label: "Frequency-Update" },
   { value: "schedule.toggle",              label: "Schedule-Toggle" },
   { value: "schedule.analyze.manual",      label: "Manual-Analyse" },
@@ -34,6 +48,7 @@ const TARGET_FILTERS: { value: AuditTargetType | "all"; label: string }[] = [
   { value: "all",      label: "Alle" },
   { value: "user",     label: "User" },
   { value: "schedule", label: "Schedule" },
+  { value: "team",     label: "Team" },
 ]
 
 const WITHIN_FILTERS: { value: string; label: string }[] = [
@@ -236,6 +251,16 @@ function renderTarget(e: AuditEntry) {
       </Link>
     )
   }
+  if (e.target_type === "team") {
+    return (
+      <Link
+        href={`/dashboard/teams/${e.target_id}`}
+        className="text-[var(--accent)] hover:underline"
+      >
+        team / {e.target_id.slice(0, 8)}…
+      </Link>
+    )
+  }
   if (e.target_type === "schedule") {
     // Try to extract profile_id from payload for deep-linking, else just show schedule id
     const payload = e.payload as Record<string, unknown> | null
@@ -264,6 +289,7 @@ function ActionBadge({ action }: { action: AuditActionName }) {
   const styles: Record<string, string> = {
     user:     "bg-[var(--accent-soft)] text-[var(--accent)] border-[var(--accent)]/20",
     schedule: "bg-amber-50 text-amber-700 border-amber-100",
+    team:     "bg-teal-50 text-teal-700 border-teal-100",
   }
   const cls = styles[family] ?? "bg-[var(--surface-sunken)] text-[var(--text-muted)] border-[var(--border-subtle)]"
   return (

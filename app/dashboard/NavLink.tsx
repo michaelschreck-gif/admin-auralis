@@ -46,6 +46,16 @@ export function UsersIcon() {
   )
 }
 
+export function TeamsIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
+      <rect x="1.5" y="5" width="12" height="8" rx="1" stroke="currentColor" strokeWidth="1.2"/>
+      <path d="M5 5V3.5A1 1 0 0 1 6 2.5h3a1 1 0 0 1 1 1V5" stroke="currentColor" strokeWidth="1.2"/>
+      <path d="M1.5 8.5h12" stroke="currentColor" strokeWidth="1.2"/>
+    </svg>
+  )
+}
+
 export function StatsIcon() {
   return (
     <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
@@ -73,6 +83,8 @@ export function HeaderTitle() {
   let title = "DigitalHalo Admin"
   if (pathname === "/dashboard" || pathname.startsWith("/dashboard/users")) {
     title = "Nutzerverwaltung"
+  } else if (pathname.startsWith("/dashboard/teams")) {
+    title = "Teamverwaltung"
   } else if (pathname.startsWith("/dashboard/stats")) {
     title = "Statistiken"
   } else if (pathname.startsWith("/dashboard/audit")) {

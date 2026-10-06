@@ -1,15 +1,22 @@
-import { getUsers, type Profile, type PlanType, type StatusFilter } from "@/lib/supabase/admin"
+import { getUsers, getTeamInfoFor, type Profile, type PlanType, type StatusFilter, type KindFilter, type TeamInfo } from "@/lib/supabase/admin"
 import { createClient } from "@/lib/supabase/server"
 import UserTable from "./UserTable"
 
 export const dynamic = "force-dynamic"
 
 const STATUS_VALUES = ["all", "active", "banned", "admin"] as const satisfies readonly StatusFilter[]
+const KIND_VALUES = ["all", "single", "member"] as const satisfies readonly KindFilter[]
 const PLAN_VALUES = ["all", "free", "starter", "pro", "enterprise"] as const
 
 function parseStatus(raw: string | undefined): StatusFilter {
   return (STATUS_VALUES as readonly string[]).includes(raw ?? "")
     ? (raw as StatusFilter)
+    : "all"
+}
+
+function parseKind(raw: string | undefined): KindFilter {
+  return (KIND_VALUES as readonly string[]).includes(raw ?? "")
+    ? (raw as KindFilter)
     : "all"
 }
 
@@ -27,6 +34,7 @@ export default async function DashboardPage({
     q?: string
     status?: string
     plan?: string
+    kind?: string
   }>
 }) {
   const params = await searchParams
@@ -34,6 +42,7 @@ export default async function DashboardPage({
   const search = params.q ?? ""
   const status = parseStatus(params.status)
   const plan = parsePlan(params.plan)
+  const kind = parseKind(params.kind)
 
   // Capture current admin's ID so the UI can disable self-targeting actions.
   // The layout already enforces auth + is_admin; we only need the ID here.
@@ -50,11 +59,13 @@ export default async function DashboardPage({
 
   let users: Profile[] = []
   let totalCount = 0
+  let teamInfo: TeamInfo = { teamNameById: {}, memberCountByOwner: {} }
 
   try {
-    const { data, count } = await getUsers(page, search, status, plan)
+    const { data, count } = await getUsers(page, search, status, plan, kind)
     users = data ?? []
     totalCount = count ?? 0
+    teamInfo = await getTeamInfoFor(users)
   } catch {
     // service role key unavailable at build time — render empty table
   }
@@ -67,6 +78,8 @@ export default async function DashboardPage({
       search={search}
       status={status}
       plan={plan}
+      kind={kind}
+      teamInfo={teamInfo}
       currentAdminId={currentAdminId}
     />
   )

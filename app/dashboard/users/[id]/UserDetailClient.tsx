@@ -8,10 +8,13 @@ import type {
   VisibilityReport,
   FrequencyType,
 } from "@/lib/supabase/admin"
+import Link from "next/link"
 import {
   actionUpdateScheduleFrequency,
   actionToggleSchedule,
+  actionDeleteUser,
 } from "@/app/dashboard/actions"
+import { SetPasswordModal, btnSmall } from "@/app/dashboard/ui"
 
 const FREQUENCIES: { value: FrequencyType; label: string }[] = [
   { value: "daily",   label: "Täglich" },
@@ -40,6 +43,21 @@ export default function UserDetailClient({
   const [runningScheduleId, setRunningScheduleId] = useState<string | null>(null)
   const [runSuccess, setRunSuccess] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
+  const [passwordOpen, setPasswordOpen] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
+
+  function handleDeleteAccount() {
+    setActionError(null)
+    startTransition(async () => {
+      try {
+        await actionDeleteUser(profile.id)
+        router.push("/dashboard")
+      } catch (e) {
+        setActionError(extractError(e))
+        setConfirmDelete(false)
+      }
+    })
+  }
 
   const isSelf = profile.id === currentAdminId
 
@@ -126,6 +144,45 @@ export default function UserDetailClient({
             </div>
             <p className="text-sm text-[var(--text-muted)] mt-0.5">{profile.email}</p>
 
+            <div className="flex flex-wrap items-center gap-2 mt-3">
+              <button type="button" onClick={() => setPasswordOpen(true)} disabled={isPending} className={btnSmall}>
+                Passwort setzen
+              </button>
+              {profile.parent_account_id && (
+                <Link href={`/dashboard/teams/${profile.parent_account_id}`} className={btnSmall}>
+                  Zum Team →
+                </Link>
+              )}
+              {profile.plan === "enterprise" && (
+                <Link href={`/dashboard/teams/${profile.id}`} className={btnSmall}>
+                  Team verwalten →
+                </Link>
+              )}
+              {confirmDelete ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={handleDeleteAccount}
+                    disabled={isPending || isSelf}
+                    className="text-xs px-3 py-1.5 rounded-lg border bg-[var(--danger)] text-white border-[var(--danger)] disabled:opacity-40"
+                  >
+                    Konto samt Daten endgültig löschen
+                  </button>
+                  <button type="button" onClick={() => setConfirmDelete(false)} className="text-xs text-[var(--text-faint)]">✕</button>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setConfirmDelete(true)}
+                  disabled={isPending || isSelf}
+                  title={isSelf ? "Du kannst dich nicht selbst löschen" : undefined}
+                  className="text-xs px-3 py-1.5 rounded-lg border border-[var(--border-subtle)] text-[var(--text-muted)] hover:border-[var(--danger)]/25 hover:text-[var(--danger)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  Konto löschen
+                </button>
+              )}
+            </div>
+
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-4">
               <KV label="Tarif" value={<span className="capitalize">{profile.plan}</span>} />
               <KV
@@ -148,6 +205,14 @@ export default function UserDetailClient({
           </div>
         </div>
       </section>
+
+      {passwordOpen && (
+        <SetPasswordModal
+          userId={profile.id}
+          label={profile.full_name ? `${profile.full_name} (${profile.email})` : profile.email}
+          onClose={() => setPasswordOpen(false)}
+        />
+      )}
 
       {/* ───────────── Topics (monitoring_schedules) ───────────── */}
       <section className="bg-white rounded-xl border border-[var(--border-subtle)] shadow-sm">

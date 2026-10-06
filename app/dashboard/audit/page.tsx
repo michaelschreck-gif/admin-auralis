@@ -10,12 +10,19 @@ const ACTION_VALUES: AuditActionName[] = [
   "user.ban",
   "user.unban",
   "user.delete",
+  "user.create",
+  "user.password.set",
+  "team.create",
+  "team.rename",
+  "team.delete",
+  "team.member.add",
+  "team.member.remove",
   "schedule.frequency.update",
   "schedule.toggle",
   "schedule.analyze.manual",
 ]
 
-const TARGET_VALUES: AuditTargetType[] = ["user", "schedule"]
+const TARGET_VALUES: AuditTargetType[] = ["user", "schedule", "team"]
 const WITHIN_VALUES = ["24", "168", "720", "all"] as const // hours
 
 function parseAction(raw: string | undefined): AuditActionName | "all" {

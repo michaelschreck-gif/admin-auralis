@@ -31,27 +31,28 @@ export type PlanType = Database["public"]["Enums"]["plan_type"]
 export type LanguageType = Database["public"]["Enums"]["language_type"]
 
 export type StatusFilter = "all" | "active" | "banned" | "admin"
+/** Einzelpersonen = ohne Team-Zuordnung, Teammitglieder = mit Eltern-Konto. */
+export type KindFilter = "all" | "single" | "member"
 
 export async function getUsers(
   page: number,
   search: string,
   status: StatusFilter = "all",
   plan: PlanType | "all" = "all",
+  kind: KindFilter = "all",
 ) {
   const pageSize = 20
   const from = (page - 1) * pageSize
 
   let query = adminClient()
     .from("profiles")
-    .select(
-      "id, email, full_name, avatar_url, plan, language, timezone, is_admin, banned_at, created_at, updated_at",
-      { count: "exact" },
-    )
+    .select("*", { count: "exact" })
     .order("created_at", { ascending: false })
     .range(from, from + pageSize - 1)
 
   if (search) {
-    query = query.ilike("email", `%${search}%`)
+    const q = search.replace(/[%,()]/g, " ").trim()
+    query = query.or(`email.ilike.%${q}%,full_name.ilike.%${q}%`)
   }
 
   if (status === "active") {
@@ -64,6 +65,12 @@ export async function getUsers(
 
   if (plan !== "all") {
     query = query.eq("plan", plan)
+  }
+
+  if (kind === "single") {
+    query = query.is("parent_account_id", null)
+  } else if (kind === "member") {
+    query = query.not("parent_account_id", "is", null)
   }
 
   return query
@@ -122,6 +129,168 @@ export async function countAdmins() {
 }
 
 /* ─────────────────────────────────────────────────────────
+ * Kontenverwaltung: Nutzer anlegen, Passwort setzen, Teams
+ *
+ * Ein Team ist ein Enterprise-Konto (Inhaber) plus Mitglieder, deren
+ * profiles.parent_account_id auf den Inhaber zeigt – dasselbe Modell,
+ * das das Haupt-Tool (Team-Ansicht, /api/v1/sub-accounts) verwendet.
+ * ───────────────────────────────────────────────────────── */
+
+export type CreateAccountInput = {
+  email: string
+  fullName: string
+  plan: PlanType
+  language: LanguageType
+  /** Leer = "verwaltet ohne eigenen Login" (zufälliges, nicht ausgegebenes Passwort). */
+  password?: string
+  parentId?: string | null
+  isAdmin?: boolean
+}
+
+export type CreateAccountResult =
+  | { ok: true; id: string; managed: boolean }
+  | { ok: false; message: string }
+
+export async function createAccount(input: CreateAccountInput): Promise<CreateAccountResult> {
+  const client = adminClient()
+  const managed = !input.password
+  const password = input.password ?? randomManagedPassword()
+
+  const { data: created, error } = await client.auth.admin.createUser({
+    email: input.email,
+    password,
+    email_confirm: true,
+    user_metadata: { full_name: input.fullName },
+  })
+  if (error || !created?.user) {
+    const msg = error?.message ?? "unknown error"
+    if (/already.*registered|already exists|duplicate/i.test(msg)) {
+      return { ok: false, message: "Diese E-Mail-Adresse existiert bereits." }
+    }
+    return { ok: false, message: `Konto konnte nicht angelegt werden: ${msg}` }
+  }
+
+  const id = created.user.id
+  const { error: updErr } = await client
+    .from("profiles")
+    .update({
+      full_name: input.fullName,
+      plan: input.plan,
+      language: input.language,
+      parent_account_id: input.parentId ?? null,
+      is_admin: input.isAdmin ?? false,
+    })
+    .eq("id", id)
+
+  if (updErr) {
+    await client.auth.admin.deleteUser(id).catch(() => {})
+    return { ok: false, message: `Profil konnte nicht gesetzt werden: ${updErr.message}` }
+  }
+  return { ok: true, id, managed }
+}
+
+function randomManagedPassword(): string {
+  const bytes = new Uint8Array(32)
+  crypto.getRandomValues(bytes)
+  return Buffer.from(bytes).toString("base64url")
+}
+
+export async function setUserPassword(userId: string, password: string) {
+  return adminClient().auth.admin.updateUserById(userId, { password })
+}
+
+export async function setUserParent(userId: string, parentId: string | null) {
+  return adminClient()
+    .from("profiles")
+    .update({ parent_account_id: parentId })
+    .eq("id", userId)
+}
+
+export async function getProfileByEmail(email: string) {
+  return adminClient()
+    .from("profiles")
+    .select("*")
+    .eq("email", email)
+    .maybeSingle()
+}
+
+export async function getProfilesByIds(ids: string[]): Promise<Profile[]> {
+  if (ids.length === 0) return []
+  const { data } = await adminClient().from("profiles").select("*").in("id", ids)
+  return data ?? []
+}
+
+/** Anzeige-Infos zur Teamzugehörigkeit für eine Seite von Nutzern. */
+export type TeamInfo = {
+  /** Eltern-ID → Name des Teams (Name des Inhabers). */
+  teamNameById: Record<string, string>
+  /** Inhaber-ID → Anzahl Mitglieder. */
+  memberCountByOwner: Record<string, number>
+}
+
+export async function getTeamInfoFor(users: Profile[]): Promise<TeamInfo> {
+  const client = adminClient()
+  const parentIds = Array.from(
+    new Set(users.map(u => u.parent_account_id).filter((x): x is string => !!x)),
+  )
+  const ownerCandidates = users.map(u => u.id)
+
+  const [parents, members] = await Promise.all([
+    parentIds.length
+      ? client.from("profiles").select("id, full_name, email").in("id", parentIds)
+      : Promise.resolve({ data: [] as { id: string; full_name: string | null; email: string }[] }),
+    ownerCandidates.length
+      ? client.from("profiles").select("parent_account_id").in("parent_account_id", ownerCandidates)
+      : Promise.resolve({ data: [] as { parent_account_id: string | null }[] }),
+  ])
+
+  const teamNameById: Record<string, string> = {}
+  for (const p of parents.data ?? []) teamNameById[p.id] = p.full_name || p.email
+  const memberCountByOwner: Record<string, number> = {}
+  for (const m of members.data ?? []) {
+    if (m.parent_account_id) {
+      memberCountByOwner[m.parent_account_id] = (memberCountByOwner[m.parent_account_id] ?? 0) + 1
+    }
+  }
+  return { teamNameById, memberCountByOwner }
+}
+
+export type TeamRow = {
+  owner: Profile
+  memberCount: number
+}
+
+/** Alle Teams: Enterprise-Konten ohne Eltern-Konto sowie jedes Konto mit Mitgliedern. */
+export async function getTeams(): Promise<TeamRow[]> {
+  const client = adminClient()
+  const [enterprise, children] = await Promise.all([
+    client.from("profiles").select("*").eq("plan", "enterprise").is("parent_account_id", null),
+    client.from("profiles").select("parent_account_id").not("parent_account_id", "is", null),
+  ])
+  const counts = new Map<string, number>()
+  for (const c of children.data ?? []) {
+    if (c.parent_account_id) counts.set(c.parent_account_id, (counts.get(c.parent_account_id) ?? 0) + 1)
+  }
+  const owners = new Map<string, Profile>()
+  for (const p of enterprise.data ?? []) owners.set(p.id, p)
+  const missing = Array.from(counts.keys()).filter(id => !owners.has(id))
+  for (const p of await getProfilesByIds(missing)) owners.set(p.id, p)
+
+  return Array.from(owners.values())
+    .map(owner => ({ owner, memberCount: counts.get(owner.id) ?? 0 }))
+    .sort((a, b) => (a.owner.full_name ?? a.owner.email).localeCompare(b.owner.full_name ?? b.owner.email, "de"))
+}
+
+export async function getTeamMembers(ownerId: string): Promise<Profile[]> {
+  const { data } = await adminClient()
+    .from("profiles")
+    .select("*")
+    .eq("parent_account_id", ownerId)
+    .order("created_at", { ascending: true })
+  return data ?? []
+}
+
+/* ─────────────────────────────────────────────────────────
  * User Detail – profile, topics (schedules), reports
  * ───────────────────────────────────────────────────────── */
 
@@ -133,9 +302,7 @@ export type FrequencyType = Database["public"]["Enums"]["frequency_type"]
 export async function getUserById(userId: string) {
   return adminClient()
     .from("profiles")
-    .select(
-      "id, email, full_name, avatar_url, plan, language, timezone, is_admin, banned_at, created_at, updated_at",
-    )
+    .select("*")
     .eq("id", userId)
     .single()
 }
@@ -398,11 +565,18 @@ export type AuditActionName =
   | "user.ban"
   | "user.unban"
   | "user.delete"
+  | "user.create"
+  | "user.password.set"
+  | "team.create"
+  | "team.rename"
+  | "team.delete"
+  | "team.member.add"
+  | "team.member.remove"
   | "schedule.frequency.update"
   | "schedule.toggle"
   | "schedule.analyze.manual"
 
-export type AuditTargetType = "user" | "schedule"
+export type AuditTargetType = "user" | "schedule" | "team"
 
 /**
  * Fire-and-forget audit logger. Failures are logged but never thrown

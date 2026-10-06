@@ -3,8 +3,11 @@
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useTransition, useState, useEffect } from "react"
-import type { Profile, PlanType, StatusFilter, LanguageType } from "@/lib/supabase/admin"
+import type { Profile, PlanType, StatusFilter, KindFilter, LanguageType, TeamInfo } from "@/lib/supabase/admin"
+import { ModalShell, Field, SetPasswordModal, PasswordField, ErrorBox, extractError, inputCls, btnPrimary, btnGhost } from "./ui"
+import { validatePassword } from "@/lib/accounts"
 import {
+  actionCreateUser,
   actionUpdatePlan,
   actionUpdateProfile,
   actionBanUser,
@@ -39,6 +42,12 @@ const PLAN_FILTERS: { value: PlanType | "all"; label: string }[] = [
   { value: "enterprise", label: "Enterprise" },
 ]
 
+const KIND_FILTERS: { value: KindFilter; label: string }[] = [
+  { value: "all",    label: "Alle" },
+  { value: "single", label: "Einzelpersonen" },
+  { value: "member", label: "Teammitglieder" },
+]
+
 export default function UserTable({
   users,
   totalCount,
@@ -46,6 +55,8 @@ export default function UserTable({
   search,
   status,
   plan,
+  kind,
+  teamInfo,
   currentAdminId,
 }: {
   users: Profile[]
@@ -54,6 +65,8 @@ export default function UserTable({
   search: string
   status: StatusFilter
   plan: PlanType | "all"
+  kind: KindFilter
+  teamInfo: TeamInfo
   currentAdminId: string
 }) {
   const router = useRouter()
@@ -62,10 +75,12 @@ export default function UserTable({
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
   const [editUser, setEditUser]   = useState<Profile | null>(null)
   const [inviteOpen, setInviteOpen] = useState(false)
+  const [createOpen, setCreateOpen] = useState(false)
+  const [passwordUser, setPasswordUser] = useState<Profile | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
 
   // Clear error when modals open/close.
-  useEffect(() => { if (!editUser && !inviteOpen) setActionError(null) }, [editUser, inviteOpen])
+  useEffect(() => { if (!editUser && !inviteOpen && !createOpen) setActionError(null) }, [editUser, inviteOpen, createOpen])
 
   const totalPages = Math.ceil(totalCount / 20)
 
@@ -80,6 +95,10 @@ export default function UserTable({
 
   function handleSearch(q: string) {
     navigate({ q, page: "1" })
+  }
+
+  function handleKind(k: KindFilter) {
+    navigate({ kind: k, page: "1" })
   }
 
   function handleStatus(s: StatusFilter) {
@@ -132,20 +151,28 @@ export default function UserTable({
         <input
           type="text"
           defaultValue={search}
-          placeholder="Nach E-Mail filtern…"
+          placeholder="Nach E-Mail oder Name filtern…"
           onChange={e => handleSearch(e.target.value)}
           className="bg-white border border-[var(--border-subtle)] rounded-lg px-4 py-2 text-sm text-[var(--foreground)] placeholder-[var(--text-faint)] focus:outline-none focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent)]/20 w-72 transition-colors"
         />
         <button
           type="button"
-          onClick={() => setInviteOpen(true)}
+          onClick={() => setCreateOpen(true)}
           className="text-sm px-4 py-2 rounded-lg bg-[var(--accent)] text-white font-medium hover:bg-[var(--accent-strong)] transition-colors disabled:opacity-50"
           disabled={isPending}
         >
-          + User einladen
+          + Nutzer anlegen
+        </button>
+        <button
+          type="button"
+          onClick={() => setInviteOpen(true)}
+          className="text-sm px-4 py-2 rounded-lg border border-[var(--border-subtle)] bg-white text-[var(--text-muted)] hover:border-[var(--accent)] hover:text-[var(--accent)] transition-colors disabled:opacity-50"
+          disabled={isPending}
+        >
+          Per E-Mail einladen
         </button>
         <span className="text-sm text-[var(--text-muted)]">
-          {totalCount} Nutzer{search || status !== "all" || plan !== "all" ? " (gefiltert)" : " gesamt"}
+          {totalCount} Nutzer{search || status !== "all" || plan !== "all" || kind !== "all" ? " (gefiltert)" : " gesamt"}
         </span>
         {isPending && (
           <span className="text-xs text-[var(--accent)] flex items-center gap-1.5">
@@ -157,7 +184,13 @@ export default function UserTable({
 
       {/* Filter pills */}
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-xs uppercase tracking-wider font-semibold text-[var(--text-faint)] mr-1">Status</span>
+        <span className="text-xs uppercase tracking-wider font-semibold text-[var(--text-faint)] mr-1">Typ</span>
+        {KIND_FILTERS.map(k => (
+          <FilterPill key={k.value} active={kind === k.value} onClick={() => handleKind(k.value)}>
+            {k.label}
+          </FilterPill>
+        ))}
+        <span className="text-xs uppercase tracking-wider font-semibold text-[var(--text-faint)] mx-1 ml-4">Status</span>
         {STATUS_FILTERS.map(s => (
           <FilterPill
             key={s.value}
@@ -251,6 +284,23 @@ export default function UserTable({
                           Admin
                         </span>
                       )}
+                      {(teamInfo.memberCountByOwner[user.id] ?? 0) > 0 && (
+                        <Link
+                          href={`/dashboard/teams/${user.id}`}
+                          className="text-xs px-2 py-0.5 rounded-full bg-teal-50 text-teal-700 font-medium border border-teal-100 hover:underline"
+                        >
+                          Team · {teamInfo.memberCountByOwner[user.id]}
+                        </Link>
+                      )}
+                      {user.parent_account_id && (
+                        <Link
+                          href={`/dashboard/teams/${user.parent_account_id}`}
+                          className="text-xs px-2 py-0.5 rounded-full bg-teal-50 text-teal-700 font-medium border border-teal-100 hover:underline"
+                          title="Zum Team"
+                        >
+                          Mitglied · {teamInfo.teamNameById[user.parent_account_id] ?? "Team"}
+                        </Link>
+                      )}
                       {isSelf && (
                         <span className="text-xs px-2 py-0.5 rounded-full bg-[var(--accent-soft)] text-[var(--accent)] font-medium border border-[var(--accent)]/20">
                           Du
@@ -311,6 +361,13 @@ export default function UserTable({
                         Bearbeiten
                       </button>
                       <button
+                        onClick={() => setPasswordUser(user)}
+                        disabled={isPending}
+                        className="text-xs px-3 py-1.5 rounded-lg border border-[var(--border-subtle)] text-[var(--text-muted)] hover:border-[var(--accent)] hover:text-[var(--accent)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        Passwort
+                      </button>
+                      <button
                         onClick={() => handleBan(user.id, isBanned)}
                         disabled={isPending || isSelf}
                         title={isSelf ? "Du kannst dich nicht selbst sperren" : undefined}
@@ -325,7 +382,7 @@ export default function UserTable({
                       <button
                         onClick={() => handleDelete(user.id)}
                         disabled={isPending || isSelf}
-                        title={isSelf ? "Du kannst dich nicht selbst löschen" : undefined}
+                        title={isSelf ? "Du kannst dich nicht selbst löschen" : "Konto samt allen Daten endgültig löschen"}
                         className={`text-xs px-3 py-1.5 rounded-lg border transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
                           confirmDelete === user.id
                             ? "bg-[var(--danger-soft)]0 text-white border-[var(--danger)]"
@@ -381,6 +438,18 @@ export default function UserTable({
           isSelf={editUser.id === currentAdminId}
           onClose={() => setEditUser(null)}
           onError={(msg) => setActionError(msg)}
+        />
+      )}
+      {createOpen && (
+        <CreateUserModal
+          onClose={() => setCreateOpen(false)}
+        />
+      )}
+      {passwordUser && (
+        <SetPasswordModal
+          userId={passwordUser.id}
+          label={passwordUser.full_name ? `${passwordUser.full_name} (${passwordUser.email})` : passwordUser.email}
+          onClose={() => setPasswordUser(null)}
         />
       )}
       {inviteOpen && (
@@ -593,51 +662,6 @@ function InviteUserModal({
   )
 }
 
-function ModalShell({
-  title,
-  onClose,
-  children,
-}: {
-  title: string
-  onClose: () => void
-  children: React.ReactNode
-}) {
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/30 backdrop-blur-sm"
-      onClick={onClose}
-    >
-      <div
-        className="w-full max-w-md bg-white rounded-2xl border border-[var(--border-subtle)] shadow-xl p-6 space-y-4"
-        onClick={e => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between">
-          <h2 className="text-base font-semibold text-[var(--foreground)]">{title}</h2>
-          <button
-            type="button"
-            onClick={onClose}
-            className="text-[var(--text-faint)] hover:text-[var(--foreground)] text-lg leading-none"
-          >
-            ✕
-          </button>
-        </div>
-        {children}
-      </div>
-    </div>
-  )
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="space-y-1.5">
-      <label className="text-xs text-[var(--text-muted)] font-medium uppercase tracking-wider">
-        {label}
-      </label>
-      {children}
-    </div>
-  )
-}
-
 function ReadonlyRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="space-y-1.5">
@@ -649,8 +673,81 @@ function ReadonlyRow({ label, value }: { label: string; value: string }) {
   )
 }
 
-function extractError(e: unknown): string {
-  if (e instanceof Error) return e.message
-  if (typeof e === "string") return e
-  return "Unbekannter Fehler."
+function CreateUserModal({ onClose }: { onClose: () => void }) {
+  const [email, setEmail] = useState("")
+  const [fullName, setFullName] = useState("")
+  const [password, setPassword] = useState("")
+  const [plan, setPlan] = useState<PlanType>("free")
+  const [language, setLanguage] = useState<LanguageType>("de")
+  const [isAdmin, setIsAdmin] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [created, setCreated] = useState<{ email: string; password: string } | null>(null)
+  const [isPending, startTransition] = useTransition()
+
+  function save() {
+    const v = validatePassword(password)
+    if (v) { setError(v); return }
+    setError(null)
+    startTransition(async () => {
+      try {
+        await actionCreateUser({ email, fullName, password, plan, language, isAdmin })
+        setCreated({ email: email.trim().toLowerCase(), password })
+      } catch (e) {
+        setError(extractError(e))
+      }
+    })
+  }
+
+  return (
+    <ModalShell onClose={onClose} title="Nutzer anlegen">
+      {created ? (
+        <>
+          <div className="rounded-lg bg-green-50 border border-green-100 px-4 py-3 space-y-1">
+            <p className="text-xs text-green-700 font-medium">Konto angelegt. Zugangsdaten, werden nicht noch einmal angezeigt:</p>
+            <p className="text-sm text-green-800 break-all">{created.email}</p>
+            <p className="text-sm font-mono text-green-800 select-all break-all">{created.password}</p>
+          </div>
+          <div className="flex justify-end pt-2">
+            <button type="button" onClick={onClose} className={btnPrimary}>Fertig</button>
+          </div>
+        </>
+      ) : (
+        <>
+          <p className="text-xs text-[var(--text-muted)]">
+            Legt das Konto sofort mit Passwort an, ohne Einladungs-Mail. Die Person kann sich direkt anmelden.
+          </p>
+          <Field label="Name">
+            <input type="text" value={fullName} onChange={e => setFullName(e.target.value)} placeholder="z.B. Max Mustermann" autoFocus className={inputCls} />
+          </Field>
+          <Field label="E-Mail">
+            <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="user@example.com" className={inputCls} />
+          </Field>
+          <PasswordField value={password} onChange={setPassword} hint="Mindestens 10 Zeichen." />
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Tarif">
+              <select value={plan} onChange={e => setPlan(e.target.value as PlanType)} className={inputCls}>
+                {PLANS.map(p => <option key={p} value={p}>{p}</option>)}
+              </select>
+            </Field>
+            <Field label="Sprache">
+              <select value={language} onChange={e => setLanguage(e.target.value as LanguageType)} className={inputCls}>
+                {LANGUAGES.map(l => <option key={l.code} value={l.code}>{l.flag} {l.label}</option>)}
+              </select>
+            </Field>
+          </div>
+          <label className="flex items-center gap-3 cursor-pointer p-3 border border-[var(--border-subtle)] rounded-lg hover:border-[var(--accent)] transition-colors">
+            <input type="checkbox" checked={isAdmin} onChange={e => setIsAdmin(e.target.checked)} className="w-4 h-4 accent-[var(--accent)]" />
+            <span className="text-sm text-[var(--foreground)]">Admin-Rechte vergeben</span>
+          </label>
+          {error && <ErrorBox>{error}</ErrorBox>}
+          <div className="flex items-center justify-end gap-2 pt-2">
+            <button type="button" onClick={onClose} disabled={isPending} className={btnGhost}>Abbrechen</button>
+            <button type="button" onClick={save} disabled={isPending || !email.trim() || !fullName.trim() || !password} className={btnPrimary}>
+              {isPending ? "Legt an…" : "Anlegen"}
+            </button>
+          </div>
+        </>
+      )}
+    </ModalShell>
+  )
 }
