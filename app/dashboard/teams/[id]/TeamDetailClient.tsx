@@ -4,7 +4,7 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useState, useTransition } from "react"
 import type { Profile, LanguageType } from "@/lib/supabase/admin"
-import { validatePassword } from "@/lib/accounts"
+import { validatePassword, teamLabel } from "@/lib/accounts"
 import {
   actionRenameTeam,
   actionCreateTeamMember,
@@ -32,7 +32,7 @@ export default function TeamDetailClient({
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
-  const [name, setName] = useState(owner.full_name ?? "")
+  const [name, setName] = useState(teamLabel(owner))
   const [passwordFor, setPasswordFor] = useState<Profile | null>(null)
   const [addOpen, setAddOpen] = useState(false)
   const [existingOpen, setExistingOpen] = useState(false)
@@ -72,7 +72,7 @@ export default function TeamDetailClient({
           </div>
           <button
             type="button"
-            disabled={isPending || !name.trim() || name.trim() === (owner.full_name ?? "")}
+            disabled={isPending || !name.trim() || name.trim() === teamLabel(owner)}
             onClick={() => run(() => actionRenameTeam(owner.id, name))}
             className={btnPrimary}
           >
@@ -82,7 +82,9 @@ export default function TeamDetailClient({
         <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
           <span className="text-[var(--text-muted)]">
             Inhaber:{" "}
-            <Link href={`/dashboard/users/${owner.id}`} className="text-[var(--accent)] hover:underline">{owner.email}</Link>
+            <Link href={`/dashboard/users/${owner.id}`} className="text-[var(--accent)] hover:underline">
+              {owner.full_name ? `${owner.full_name} · ` : ""}{owner.email}
+            </Link>
           </span>
           <span className="text-[var(--text-muted)] capitalize">Tarif: {owner.plan}</span>
           {owner.banned_at && (
@@ -199,7 +201,7 @@ export default function TeamDetailClient({
       {deleteTeamOpen && (
         <DeleteTeamModal
           teamId={owner.id}
-          name={owner.full_name ?? owner.email}
+          name={teamLabel(owner)}
           memberCount={members.length}
           onClose={() => setDeleteTeamOpen(false)}
           onDone={() => router.push("/dashboard/teams")}

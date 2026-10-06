@@ -351,6 +351,7 @@ export type Database = {
           public_profile_enabled: boolean
           public_slug: string | null
           subject_name: string | null
+          team_name: string | null
           target_markets: string[]
           timezone: string
           updated_at: string
@@ -370,6 +371,7 @@ export type Database = {
           public_profile_enabled?: boolean
           public_slug?: string | null
           subject_name?: string | null
+          team_name?: string | null
           target_markets?: string[]
           timezone?: string
           updated_at?: string
@@ -389,6 +391,7 @@ export type Database = {
           public_profile_enabled?: boolean
           public_slug?: string | null
           subject_name?: string | null
+          team_name?: string | null
           target_markets?: string[]
           timezone?: string
           updated_at?: string

@@ -1,5 +1,6 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js"
 import type { Database, Tables, TablesUpdate } from "./database.types"
+import { teamLabel } from "../accounts"
 
 /**
  * Lazily instantiated service-role client.
@@ -85,7 +86,7 @@ export async function updateUserPlan(userId: string, plan: PlanType) {
 
 type UpdateProfilePatch = Pick<
   TablesUpdate<"profiles">,
-  "full_name" | "language" | "is_admin"
+  "full_name" | "language" | "is_admin" | "team_name"
 >
 
 export async function updateUserProfile(userId: string, patch: UpdateProfilePatch) {
@@ -145,6 +146,7 @@ export type CreateAccountInput = {
   password?: string
   parentId?: string | null
   isAdmin?: boolean
+  teamName?: string | null
 }
 
 export type CreateAccountResult =
@@ -179,6 +181,7 @@ export async function createAccount(input: CreateAccountInput): Promise<CreateAc
       language: input.language,
       parent_account_id: input.parentId ?? null,
       is_admin: input.isAdmin ?? false,
+      ...(input.teamName ? { team_name: input.teamName } : {}),
     })
     .eq("id", id)
 
@@ -245,15 +248,15 @@ export async function getTeamInfoFor(users: Profile[]): Promise<TeamInfo> {
 
   const [parents, members] = await Promise.all([
     parentIds.length
-      ? client.from("profiles").select("id, full_name, email").in("id", parentIds)
-      : Promise.resolve({ data: [] as { id: string; full_name: string | null; email: string }[] }),
+      ? client.from("profiles").select("id, full_name, team_name, email").in("id", parentIds)
+      : Promise.resolve({ data: [] as { id: string; full_name: string | null; team_name: string | null; email: string }[] }),
     ownerCandidates.length
       ? client.from("profiles").select("parent_account_id").in("parent_account_id", ownerCandidates)
       : Promise.resolve({ data: [] as { parent_account_id: string | null }[] }),
   ])
 
   const teamNameById: Record<string, string> = {}
-  for (const p of parents.data ?? []) teamNameById[p.id] = p.full_name || p.email
+  for (const p of parents.data ?? []) teamNameById[p.id] = teamLabel(p)
   const memberCountByOwner: Record<string, number> = {}
   for (const m of members.data ?? []) {
     if (m.parent_account_id) {
@@ -286,7 +289,7 @@ export async function getTeams(): Promise<TeamRow[]> {
 
   return Array.from(owners.values())
     .map(owner => ({ owner, memberCount: counts.get(owner.id) ?? 0 }))
-    .sort((a, b) => (a.owner.full_name ?? a.owner.email).localeCompare(b.owner.full_name ?? b.owner.email, "de"))
+    .sort((a, b) => teamLabel(a.owner).localeCompare(teamLabel(b.owner), "de"))
 }
 
 export async function getTeamMembers(ownerId: string): Promise<Profile[]> {

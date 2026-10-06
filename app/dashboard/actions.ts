@@ -22,7 +22,7 @@ import {
   type LanguageType,
   type FrequencyType,
 } from "@/lib/supabase/admin"
-import { EMAIL_RE, validatePassword } from "@/lib/accounts"
+import { EMAIL_RE, validatePassword, teamLabel } from "@/lib/accounts"
 import { createClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
@@ -299,16 +299,18 @@ async function impl_actionSetPassword(userId: string, password: string) {
 }
 
 /**
- * Legt ein Team an. Inhaber ist entweder ein neues Konto (mit Passwort) oder
- * ein bestehender Nutzer, der dabei auf Enterprise gestellt wird.
+ * Legt ein Team mit eigenem Namen an. Inhaber ist entweder ein bestehender
+ * Nutzer (wird auf Enterprise gestellt) oder ein neues Konto mit Passwort.
  */
 async function impl_actionCreateTeam(input: {
+  teamName: string
   language: LanguageType
   owner:
-    | { mode: "new"; teamName: string; email: string; password: string }
+    | { mode: "new"; email: string; password: string; contactName?: string }
     | { mode: "existing"; userId: string }
 }) {
   const actor = await requireAdmin()
+  const teamName = cleanName(input.teamName, "Teamname")
 
   if (input.owner.mode === "existing") {
     const [person] = await getProfilesByIds([input.owner.userId])
@@ -316,31 +318,48 @@ async function impl_actionCreateTeam(input: {
     if (person.parent_account_id) {
       throw new Error("Dieser Nutzer ist bereits Mitglied eines Teams und kann nicht Inhaber sein.")
     }
-    const { error } = await setPlan(person.id, "enterprise")
-    if (error) throw new Error(error.message)
+    const info = await getTeamInfoFor([person])
+    if ((info.memberCountByOwner[person.id] ?? 0) > 0) {
+      throw new Error(`Dieser Nutzer ist bereits Inhaber des Teams „${teamLabel(person)}“. Wähle eine andere Person oder lege ein neues Konto an.`)
+    }
+    const { error } = await updateUserProfile(person.id, { team_name: teamName })
+    if (error) {
+      if (/team_name/.test(error.message)) {
+        throw new Error("Die Datenbank kennt das Feld „Teamname“ noch nicht (Migration 20261006140000 fehlt).")
+      }
+      throw new Error(error.message)
+    }
+    const { error: planErr } = await setPlan(person.id, "enterprise")
+    if (planErr) throw new Error(planErr.message)
     await logAudit(actor.id, actor.email, "team.create", {
       targetType: "team",
       targetId: person.id,
-      payload: { name: person.full_name, owner_email: person.email, existing_user: true },
+      payload: { name: teamName, owner_email: person.email, existing_user: true },
     })
     revalidatePath("/dashboard/teams")
     revalidatePath("/dashboard")
     return { id: person.id }
   }
 
-  const teamName = cleanName(input.owner.teamName, "Teamname")
   const email = cleanEmail(input.owner.email)
   const password = cleanPassword(input.owner.password)
   if (!password) throw new Error("Bitte ein Passwort für den Team-Inhaber vergeben.")
+  const contact = input.owner.contactName?.trim() || teamName
 
   const res = await createAccount({
     email,
-    fullName: teamName,
+    fullName: contact,
     password,
     plan: "enterprise",
     language: input.language,
+    teamName,
   })
-  if (!res.ok) throw new Error(res.message)
+  if (!res.ok) {
+    if (/team_name/.test(res.message)) {
+      throw new Error("Die Datenbank kennt das Feld „Teamname“ noch nicht (Migration 20261006140000 fehlt).")
+    }
+    throw new Error(res.message)
+  }
   await logAudit(actor.id, actor.email, "team.create", {
     targetType: "team",
     targetId: res.id,
@@ -354,6 +373,7 @@ export type PickerUser = {
   id: string
   email: string
   full_name: string | null
+  team_name: string | null
   plan: PlanType
   is_admin: boolean
   parent_account_id: string | null
@@ -370,6 +390,7 @@ async function impl_actionSearchUsers(query: string): Promise<PickerUser[]> {
     id: p.id,
     email: p.email,
     full_name: p.full_name,
+    team_name: p.team_name,
     plan: p.plan,
     is_admin: p.is_admin,
     parent_account_id: p.parent_account_id,
@@ -381,7 +402,7 @@ async function impl_actionSearchUsers(query: string): Promise<PickerUser[]> {
 async function impl_actionRenameTeam(teamId: string, name: string) {
   const actor = await requireAdmin()
   const teamName = cleanName(name, "Teamname")
-  const { error } = await updateUserProfile(teamId, { full_name: teamName })
+  const { error } = await updateUserProfile(teamId, { team_name: teamName })
   if (error) throw new Error(error.message)
   await logAudit(actor.id, actor.email, "team.rename", {
     targetType: "team",
@@ -509,7 +530,7 @@ async function impl_actionDeleteTeam(teamId: string, withMembers: boolean) {
     targetType: "team",
     targetId: teamId,
     payload: {
-      name: owner.full_name,
+      name: teamLabel(owner),
       owner_email: owner.email,
       members_deleted: deletedMembers,
       members_kept: withMembers ? 0 : members.length,

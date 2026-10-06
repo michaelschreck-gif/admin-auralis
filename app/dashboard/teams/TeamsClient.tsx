@@ -4,7 +4,7 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useState, useTransition } from "react"
 import type { TeamRow, LanguageType } from "@/lib/supabase/admin"
-import { validatePassword } from "@/lib/accounts"
+import { validatePassword, teamLabel } from "@/lib/accounts"
 import { actionCreateTeam } from "../api"
 import {
   ModalShell, Field, PasswordField, ErrorBox, UserPicker, extractError,
@@ -24,7 +24,7 @@ export default function TeamsClient({
   const q = query.trim().toLowerCase()
   const shown = q
     ? teams.filter(t =>
-        (t.owner.full_name ?? "").toLowerCase().includes(q) || t.owner.email.toLowerCase().includes(q))
+        teamLabel(t.owner).toLowerCase().includes(q) || (t.owner.full_name ?? "").toLowerCase().includes(q) || t.owner.email.toLowerCase().includes(q))
     : teams
   const totalMembers = teams.reduce((n, t) => n + t.memberCount, 0)
 
@@ -70,10 +70,10 @@ export default function TeamsClient({
               <tr key={t.owner.id} className="hover:bg-[var(--surface-muted)] transition-colors">
                 <td className="px-4 py-3">
                   <Link href={`/dashboard/teams/${t.owner.id}`} className="font-medium text-[var(--foreground)] hover:text-[var(--accent)]">
-                    {t.owner.full_name ?? "—"}
+                    {teamLabel(t.owner)}
                   </Link>
                 </td>
-                <td className="px-4 py-3 text-xs text-[var(--text-muted)]">{t.owner.email}</td>
+                <td className="px-4 py-3 text-xs text-[var(--text-muted)]">{t.owner.full_name ? `${t.owner.full_name} · ` : ""}{t.owner.email}</td>
                 <td className="px-4 py-3 text-[var(--text-muted)]">{t.memberCount}</td>
                 <td className="px-4 py-3 text-xs capitalize text-[var(--text-muted)]">{t.owner.plan}</td>
                 <td className="px-4 py-3 text-xs text-[var(--text-muted)]">
@@ -102,6 +102,7 @@ function CreateTeamModal({ onClose }: { onClose: () => void }) {
   const router = useRouter()
   const [mode, setMode] = useState<"existing" | "new">("existing")
   const [teamName, setTeamName] = useState("")
+  const [contactName, setContactName] = useState("")
   const [ownerEmail, setOwnerEmail] = useState("")
   const [password, setPassword] = useState("")
   const [ownerId, setOwnerId] = useState<string[]>([])
@@ -120,8 +121,8 @@ function CreateTeamModal({ onClose }: { onClose: () => void }) {
       try {
         const res = await actionCreateTeam(
           mode === "new"
-            ? { language, owner: { mode: "new", teamName, email: ownerEmail, password } }
-            : { language, owner: { mode: "existing", userId: ownerId[0] } },
+            ? { teamName, language, owner: { mode: "new", email: ownerEmail, password, contactName } }
+            : { teamName, language, owner: { mode: "existing", userId: ownerId[0] } },
         )
         setCreated(mode === "new"
           ? { id: res.id, email: ownerEmail.trim().toLowerCase(), password }
@@ -173,28 +174,38 @@ function CreateTeamModal({ onClose }: { onClose: () => void }) {
           <p className="text-xs text-[var(--text-muted)]">
             Ein Team besteht aus einem Inhaber (Enterprise-Konto) und beliebig vielen Mitgliedern, die du danach hinzufügst.
           </p>
-          <div className="flex gap-2">
-            {tab("existing", "Bestehenden Nutzer wählen")}
-            {tab("new", "Neues Konto anlegen")}
+          <Field label="Teamname / Firma">
+            <input type="text" value={teamName} onChange={e => setTeamName(e.target.value)} placeholder="z.B. Muster GmbH" autoFocus className={inputCls} />
+          </Field>
+
+          <div className="space-y-2">
+            <p className="text-xs text-[var(--text-muted)] font-medium uppercase tracking-wider">Inhaber des Teams</p>
+            <div className="flex gap-2">
+              {tab("existing", "Bestehender Nutzer")}
+              {tab("new", "Neues Konto")}
+            </div>
           </div>
 
           {mode === "existing" ? (
-            <Field label="Inhaber" hint="Der gewählte Nutzer wird auf Enterprise gestellt, sein Teamname ist sein Name (später änderbar).">
+            <Field label="Inhaber auswählen" hint="Der Inhaber wird auf Enterprise gestellt. Sein Passwort und Name bleiben unverändert.">
               <UserPicker
                 mode="single"
                 selected={ownerId}
                 onChange={setOwnerId}
-                disabledReason={u => (u.parent_account_id ? `Mitglied in ${u.teamName}` : null)}
-                noteFor={u => (u.memberCount > 0 ? `Team · ${u.memberCount}` : u.plan === "enterprise" ? "Enterprise" : null)}
+                disabledReason={u =>
+                  u.parent_account_id ? `Mitglied in ${u.teamName}`
+                  : u.memberCount > 0 ? `Hat schon ein Team${u.team_name ? `: ${u.team_name}` : ""}`
+                  : null}
+                noteFor={u => (u.plan === "enterprise" ? "Enterprise" : null)}
               />
             </Field>
           ) : (
             <>
-              <Field label="Teamname / Firma">
-                <input type="text" value={teamName} onChange={e => setTeamName(e.target.value)} placeholder="z.B. Muster GmbH" autoFocus className={inputCls} />
-              </Field>
               <Field label="E-Mail des Inhabers">
                 <input type="email" value={ownerEmail} onChange={e => setOwnerEmail(e.target.value)} placeholder="inhaber@firma.de" className={inputCls} />
+              </Field>
+              <Field label="Name des Inhabers (optional)">
+                <input type="text" value={contactName} onChange={e => setContactName(e.target.value)} placeholder="Ansprechperson" className={inputCls} />
               </Field>
               <PasswordField value={password} onChange={setPassword} hint="Mindestens 10 Zeichen." />
               <Field label="Sprache">
@@ -219,7 +230,7 @@ function CreateTeamModal({ onClose }: { onClose: () => void }) {
               onClick={save}
               disabled={
                 isPending ||
-                (mode === "existing" ? ownerId.length === 0 : !teamName.trim() || !ownerEmail.trim() || !password)
+                !teamName.trim() || (mode === "existing" ? ownerId.length === 0 : !ownerEmail.trim() || !password)
               }
               className={btnPrimary}
             >
