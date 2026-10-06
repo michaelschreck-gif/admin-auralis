@@ -25,8 +25,3 @@ export function generatePassword(length = 16): string {
 }
 
 export type AccountKind = "team_owner" | "member" | "single"
-
-/** Anzeigename eines Teams: Teamname, sonst Name bzw. E-Mail des Inhabers. */
-export function teamLabel(p: { team_name?: string | null; full_name: string | null; email: string }): string {
-  return p.team_name?.trim() || p.full_name || p.email
-}

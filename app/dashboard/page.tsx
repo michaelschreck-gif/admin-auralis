@@ -1,4 +1,4 @@
-import { getUsers, getTeamInfoFor, type Profile, type PlanType, type StatusFilter, type KindFilter, type TeamInfo } from "@/lib/supabase/admin"
+import { getUsers, getTeamsForProfiles, type Profile, type PlanType, type StatusFilter, type KindFilter, type TeamRef } from "@/lib/supabase/admin"
 import { createClient } from "@/lib/supabase/server"
 import UserTable from "./UserTable"
 
@@ -59,13 +59,13 @@ export default async function DashboardPage({
 
   let users: Profile[] = []
   let totalCount = 0
-  let teamInfo: TeamInfo = { teamNameById: {}, memberCountByOwner: {} }
+  let teamsByProfile: Record<string, TeamRef[]> = {}
 
   try {
     const { data, count } = await getUsers(page, search, status, plan, kind)
     users = data ?? []
     totalCount = count ?? 0
-    teamInfo = await getTeamInfoFor(users)
+    teamsByProfile = await getTeamsForProfiles(users.map(u => u.id))
   } catch {
     // service role key unavailable at build time — render empty table
   }
@@ -79,7 +79,7 @@ export default async function DashboardPage({
       status={status}
       plan={plan}
       kind={kind}
-      teamInfo={teamInfo}
+      teamsByProfile={teamsByProfile}
       currentAdminId={currentAdminId}
     />
   )

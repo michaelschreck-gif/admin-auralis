@@ -10,19 +10,23 @@ import {
   countAdmins,
   createAccount,
   setUserPassword,
-  setUserParent,
   getProfilesByIds,
   searchProfiles,
-  getTeamInfoFor,
-  updateUserPlan as setPlan,
+  getTeamsForProfiles,
+  getTeam,
   getTeamMembers,
+  createTeamRow,
+  renameTeamRow,
+  deleteTeamRow,
+  addTeamMembers,
+  removeTeamMember,
   updateSchedule,
   logAudit,
   type PlanType,
   type LanguageType,
   type FrequencyType,
 } from "@/lib/supabase/admin"
-import { EMAIL_RE, validatePassword, teamLabel } from "@/lib/accounts"
+import { EMAIL_RE, validatePassword } from "@/lib/accounts"
 import { createClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
@@ -298,112 +302,58 @@ async function impl_actionSetPassword(userId: string, password: string) {
   })
 }
 
-/**
- * Legt ein Team mit eigenem Namen an. Inhaber ist entweder ein bestehender
- * Nutzer (wird auf Enterprise gestellt) oder ein neues Konto mit Passwort.
- */
-async function impl_actionCreateTeam(input: {
-  teamName: string
-  language: LanguageType
-  owner:
-    | { mode: "new"; email: string; password: string; contactName?: string }
-    | { mode: "existing"; userId: string }
-}) {
+/** Legt ein Team an und fügt direkt beliebig viele bestehende Personen hinzu. */
+async function impl_actionCreateTeam(input: { name: string; memberIds: string[] }) {
   const actor = await requireAdmin()
-  const teamName = cleanName(input.teamName, "Teamname")
-
-  if (input.owner.mode === "existing") {
-    const [person] = await getProfilesByIds([input.owner.userId])
-    if (!person) throw new Error("Nutzer nicht gefunden.")
-    if (person.parent_account_id) {
-      throw new Error("Dieser Nutzer ist bereits Mitglied eines Teams und kann nicht Inhaber sein.")
-    }
-    const info = await getTeamInfoFor([person])
-    if ((info.memberCountByOwner[person.id] ?? 0) > 0) {
-      throw new Error(`Dieser Nutzer ist bereits Inhaber des Teams „${teamLabel(person)}“. Wähle eine andere Person oder lege ein neues Konto an.`)
-    }
-    const { error } = await updateUserProfile(person.id, { team_name: teamName })
-    if (error) {
-      if (/team_name/.test(error.message)) {
-        throw new Error("Die Datenbank kennt das Feld „Teamname“ noch nicht (Migration 20261006140000 fehlt).")
-      }
-      throw new Error(error.message)
-    }
-    const { error: planErr } = await setPlan(person.id, "enterprise")
-    if (planErr) throw new Error(planErr.message)
-    await logAudit(actor.id, actor.email, "team.create", {
-      targetType: "team",
-      targetId: person.id,
-      payload: { name: teamName, owner_email: person.email, existing_user: true },
-    })
-    revalidatePath("/dashboard/teams")
-    revalidatePath("/dashboard")
-    return { id: person.id }
-  }
-
-  const email = cleanEmail(input.owner.email)
-  const password = cleanPassword(input.owner.password)
-  if (!password) throw new Error("Bitte ein Passwort für den Team-Inhaber vergeben.")
-  const contact = input.owner.contactName?.trim() || teamName
-
-  const res = await createAccount({
-    email,
-    fullName: contact,
-    password,
-    plan: "enterprise",
-    language: input.language,
-    teamName,
-  })
-  if (!res.ok) {
-    if (/team_name/.test(res.message)) {
-      throw new Error("Die Datenbank kennt das Feld „Teamname“ noch nicht (Migration 20261006140000 fehlt).")
-    }
-    throw new Error(res.message)
+  const name = cleanName(input.name, "Teamname")
+  const team = await createTeamRow(name)
+  let added = 0
+  try {
+    if (input.memberIds.length > 0) added = (await addTeamMembers(team.id, input.memberIds)).length
+  } catch (e) {
+    await deleteTeamRow(team.id).catch(() => {})
+    throw e
   }
   await logAudit(actor.id, actor.email, "team.create", {
     targetType: "team",
-    targetId: res.id,
-    payload: { name: teamName, owner_email: email },
+    targetId: team.id,
+    payload: { name, members: added },
   })
   revalidatePath("/dashboard/teams")
-  return { id: res.id }
+  revalidatePath("/dashboard")
+  return { id: team.id }
 }
 
 export type PickerUser = {
   id: string
   email: string
   full_name: string | null
-  team_name: string | null
   plan: PlanType
   is_admin: boolean
-  parent_account_id: string | null
-  teamName: string | null
-  memberCount: number
+  teams: string[]
+  teamIds: string[]
 }
 
 /** Nutzersuche für die Auswahllisten (Name oder E-Mail). */
 async function impl_actionSearchUsers(query: string): Promise<PickerUser[]> {
   await requireAdmin()
-  const people = await searchProfiles(query, 10)
-  const info = await getTeamInfoFor(people)
+  const people = await searchProfiles(query, 12)
+  const teams = await getTeamsForProfiles(people.map(p => p.id))
   return people.map(p => ({
     id: p.id,
     email: p.email,
     full_name: p.full_name,
-    team_name: p.team_name,
     plan: p.plan,
     is_admin: p.is_admin,
-    parent_account_id: p.parent_account_id,
-    teamName: p.parent_account_id ? info.teamNameById[p.parent_account_id] ?? "Team" : null,
-    memberCount: info.memberCountByOwner[p.id] ?? 0,
+    teams: (teams[p.id] ?? []).map(t => t.name),
+    teamIds: (teams[p.id] ?? []).map(t => t.id),
   }))
 }
 
 async function impl_actionRenameTeam(teamId: string, name: string) {
   const actor = await requireAdmin()
   const teamName = cleanName(name, "Teamname")
-  const { error } = await updateUserProfile(teamId, { team_name: teamName })
-  if (error) throw new Error(error.message)
+  await renameTeamRow(teamId, teamName)
   await logAudit(actor.id, actor.email, "team.rename", {
     targetType: "team",
     targetId: teamId,
@@ -414,18 +364,16 @@ async function impl_actionRenameTeam(teamId: string, name: string) {
 }
 
 /**
- * Legt ein neues Teammitglied an. Ohne Passwort entsteht ein verwaltetes
- * Konto ohne eigenen Login (wie im Haupt-Tool); mit Passwort kann sich die
- * Person selbst anmelden.
+ * Legt ein neues Konto an und nimmt es ins Team auf. Ohne Passwort entsteht
+ * ein verwaltetes Konto ohne eigenen Login; mit Passwort kann sich die Person
+ * selbst anmelden.
  */
 async function impl_actionCreateTeamMember(
   teamId: string,
   input: { fullName: string; email: string; password?: string; language: LanguageType },
 ) {
   const actor = await requireAdmin()
-  const [owner] = await getProfilesByIds([teamId])
-  if (!owner) throw new Error("Team nicht gefunden.")
-  if (owner.parent_account_id) throw new Error("Dieses Konto ist selbst Teammitglied.")
+  if (!(await getTeam(teamId))) throw new Error("Team nicht gefunden.")
 
   const email = cleanEmail(input.email)
   const fullName = cleanName(input.fullName)
@@ -437,9 +385,9 @@ async function impl_actionCreateTeamMember(
     password,
     plan: "pro",
     language: input.language,
-    parentId: teamId,
   })
   if (!res.ok) throw new Error(res.message)
+  await addTeamMembers(teamId, [res.id])
   await logAudit(actor.id, actor.email, "team.member.add", {
     targetType: "team",
     targetId: teamId,
@@ -449,46 +397,30 @@ async function impl_actionCreateTeamMember(
   revalidatePath("/dashboard/teams")
 }
 
-/** Ordnet bestehende Konten einem Team zu (Mehrfachauswahl). */
+/** Ordnet bestehende Konten einem Team zu (Mehrfachauswahl, auch Mehrfach-Teams). */
 async function impl_actionAddUsersToTeam(teamId: string, userIds: string[]) {
   const actor = await requireAdmin()
   if (userIds.length === 0) throw new Error("Bitte mindestens eine Person auswählen.")
-  const [owner] = await getProfilesByIds([teamId])
-  if (!owner) throw new Error("Team nicht gefunden.")
-  if (owner.parent_account_id) throw new Error("Dieses Konto ist selbst Teammitglied.")
+  if (!(await getTeam(teamId))) throw new Error("Team nicht gefunden.")
 
-  const people = await getProfilesByIds(userIds)
-  const info = await getTeamInfoFor(people)
-  for (const person of people) {
-    const who = person.full_name || person.email
-    if (person.id === teamId) throw new Error(`${who}: Der Inhaber gehört bereits zum Team.`)
-    if (person.is_admin) throw new Error(`${who}: Admin-Konten können keinem Team zugeordnet werden.`)
-    if (person.parent_account_id === teamId) throw new Error(`${who}: ist bereits im Team.`)
-    if ((info.memberCountByOwner[person.id] ?? 0) > 0) {
-      throw new Error(`${who}: ist Inhaber eines eigenen Teams mit Mitgliedern.`)
-    }
-  }
-
-  for (const person of people) {
-    const { error } = await setUserParent(person.id, teamId)
-    if (error) throw new Error(`${person.email}: ${error.message}`)
+  const added = await addTeamMembers(teamId, userIds)
+  if (added.length > 0) {
     await logAudit(actor.id, actor.email, "team.member.add", {
       targetType: "team",
       targetId: teamId,
-      payload: { member_id: person.id, email: person.email, created: false },
+      payload: { member_ids: added, created: false },
     })
   }
   revalidatePath(`/dashboard/teams/${teamId}`)
   revalidatePath("/dashboard/teams")
   revalidatePath("/dashboard")
-  return { added: people.length }
+  return { added: added.length }
 }
 
-/** Löst die Person aus dem Team; das Konto bleibt als Einzelperson bestehen. */
+/** Entfernt die Person aus diesem Team; das Konto und andere Teams bleiben. */
 async function impl_actionRemoveFromTeam(userId: string, teamId: string) {
   const actor = await requireAdmin()
-  const { error } = await setUserParent(userId, null)
-  if (error) throw new Error(error.message)
+  await removeTeamMember(teamId, userId)
   await logAudit(actor.id, actor.email, "team.member.remove", {
     targetType: "team",
     targetId: teamId,
@@ -500,39 +432,34 @@ async function impl_actionRemoveFromTeam(userId: string, teamId: string) {
 }
 
 /**
- * Löscht ein Team. withMembers=true löscht auch alle Mitglieder samt Daten,
- * sonst bleiben sie als Einzelpersonen bestehen. Der Inhaber wird immer gelöscht.
+ * Löscht ein Team. withMembers=true löscht zusätzlich die Konten aller
+ * Mitglieder samt Daten, sonst bleiben sie als Personen bestehen.
  */
 async function impl_actionDeleteTeam(teamId: string, withMembers: boolean) {
   const actor = await requireAdmin()
+  const team = await getTeam(teamId)
+  if (!team) throw new Error("Team nicht gefunden.")
   const members = await getTeamMembers(teamId)
-  const [owner] = await getProfilesByIds([teamId])
-  if (!owner) throw new Error("Team nicht gefunden.")
 
-  const doomed = withMembers ? [owner, ...members] : [owner]
-  if (doomed.some(p => p.id === actor.id)) {
-    throw new Error("Du kannst dein eigenes Konto nicht über ein Team löschen.")
+  if (withMembers) {
+    if (members.some(m => m.id === actor.id)) {
+      throw new Error("Du bist selbst Mitglied dieses Teams und kannst dich nicht mitlöschen.")
+    }
+    if (members.some(m => m.is_admin)) {
+      throw new Error("Das Team enthält ein Admin-Konto. Bitte zuerst die Admin-Rechte entziehen oder die Person aus dem Team nehmen.")
+    }
+    for (const m of members) {
+      const { error } = await deleteUser(m.id)
+      if (error) throw new Error(`${m.email}: ${error.message}`)
+    }
   }
-  if (doomed.some(p => p.is_admin)) {
-    throw new Error("Das Team enthält ein Admin-Konto. Bitte zuerst die Admin-Rechte entziehen.")
-  }
-
-  let deletedMembers = 0
-  for (const m of withMembers ? members : []) {
-    const { error } = await deleteUser(m.id)
-    if (error) throw new Error(`${m.email}: ${error.message}`)
-    deletedMembers++
-  }
-  const { error } = await deleteUser(teamId)
-  if (error) throw new Error(error.message)
-
+  await deleteTeamRow(teamId)
   await logAudit(actor.id, actor.email, "team.delete", {
     targetType: "team",
     targetId: teamId,
     payload: {
-      name: teamLabel(owner),
-      owner_email: owner.email,
-      members_deleted: deletedMembers,
+      name: team.name,
+      members_deleted: withMembers ? members.length : 0,
       members_kept: withMembers ? 0 : members.length,
     },
   })

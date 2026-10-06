@@ -3,8 +3,8 @@
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useState, useTransition } from "react"
-import type { Profile, LanguageType } from "@/lib/supabase/admin"
-import { validatePassword, teamLabel } from "@/lib/accounts"
+import type { Profile, LanguageType, Team } from "@/lib/supabase/admin"
+import { validatePassword } from "@/lib/accounts"
 import {
   actionRenameTeam,
   actionCreateTeamMember,
@@ -21,18 +21,18 @@ import {
 } from "@/app/dashboard/ui"
 
 export default function TeamDetailClient({
-  owner,
+  team,
   members,
   currentAdminId,
 }: {
-  owner: Profile
+  team: Team
   members: Profile[]
   currentAdminId: string
 }) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
-  const [name, setName] = useState(teamLabel(owner))
+  const [name, setName] = useState(team.name)
   const [passwordFor, setPasswordFor] = useState<Profile | null>(null)
   const [addOpen, setAddOpen] = useState(false)
   const [existingOpen, setExistingOpen] = useState(false)
@@ -72,26 +72,12 @@ export default function TeamDetailClient({
           </div>
           <button
             type="button"
-            disabled={isPending || !name.trim() || name.trim() === teamLabel(owner)}
-            onClick={() => run(() => actionRenameTeam(owner.id, name))}
+            disabled={isPending || !name.trim() || name.trim() === team.name}
+            onClick={() => run(() => actionRenameTeam(team.id, name))}
             className={btnPrimary}
           >
             Umbenennen
           </button>
-        </div>
-        <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
-          <span className="text-[var(--text-muted)]">
-            Inhaber:{" "}
-            <Link href={`/dashboard/users/${owner.id}`} className="text-[var(--accent)] hover:underline">
-              {owner.full_name ? `${owner.full_name} · ` : ""}{owner.email}
-            </Link>
-          </span>
-          <span className="text-[var(--text-muted)] capitalize">Tarif: {owner.plan}</span>
-          {owner.banned_at && (
-            <span className="text-xs px-2 py-0.5 rounded-full bg-[var(--danger-soft)] text-[var(--danger)] font-medium border border-[var(--danger)]/20">Gesperrt</span>
-          )}
-          <div className="flex-1" />
-          <button type="button" onClick={() => setPasswordFor(owner)} className={btnSmall}>Inhaber-Passwort setzen</button>
         </div>
       </section>
 
@@ -136,11 +122,11 @@ export default function TeamDetailClient({
                   <button
                     type="button"
                     disabled={isPending}
-                    onClick={() => run(() => actionRemoveFromTeam(m.id, owner.id))}
+                    onClick={() => run(() => actionRemoveFromTeam(m.id, team.id))}
                     className={btnSmall}
-                    title="Konto bleibt als Einzelperson bestehen"
+                    title="Konto und andere Teams bleiben bestehen"
                   >
-                    Aus Team lösen
+                    Aus Team entfernen
                   </button>
                   {confirmDelete === m.id ? (
                     <>
@@ -176,7 +162,7 @@ export default function TeamDetailClient({
         <div className="flex-1 min-w-[16rem]">
           <h2 className="text-sm font-semibold text-[var(--danger)]">Team löschen</h2>
           <p className="text-xs text-[var(--text-muted)] mt-0.5">
-            Löscht den Inhaber samt Daten. Die Mitglieder kannst du dabei behalten oder mitlöschen.
+            Löscht das Team. Die Konten der Mitglieder kannst du dabei behalten oder mitlöschen.
           </p>
         </div>
         <button
@@ -193,15 +179,15 @@ export default function TeamDetailClient({
         <SetPasswordModal userId={passwordFor.id} label={label(passwordFor)} onClose={() => setPasswordFor(null)} />
       )}
       {addOpen && (
-        <AddMemberModal teamId={owner.id} onClose={() => { setAddOpen(false); router.refresh() }} />
+        <AddMemberModal teamId={team.id} onClose={() => { setAddOpen(false); router.refresh() }} />
       )}
       {existingOpen && (
-        <AddExistingModal teamId={owner.id} memberIds={members.map(m => m.id)} onClose={() => { setExistingOpen(false); router.refresh() }} />
+        <AddExistingModal teamId={team.id} memberIds={members.map(m => m.id)} onClose={() => { setExistingOpen(false); router.refresh() }} />
       )}
       {deleteTeamOpen && (
         <DeleteTeamModal
-          teamId={owner.id}
-          name={teamLabel(owner)}
+          teamId={team.id}
+          name={team.name}
           memberCount={members.length}
           onClose={() => setDeleteTeamOpen(false)}
           onDone={() => router.push("/dashboard/teams")}
@@ -288,8 +274,8 @@ function AddMemberModal({ teamId, onClose }: { teamId: string; onClose: () => vo
 }
 
 function AddExistingModal({
-  teamId,
   memberIds,
+  teamId,
   onClose,
 }: {
   teamId: string
@@ -322,18 +308,16 @@ function AddExistingModal({
         </>
       ) : (
         <>
-          <p className="text-xs text-[var(--text-muted)]">Wähle eine oder mehrere bereits registrierte Personen aus.</p>
+          <p className="text-xs text-[var(--text-muted)]">Wähle beliebig viele Personen aus. Sie können gleichzeitig in anderen Teams bleiben.</p>
           <UserPicker
             mode="multi"
             selected={selected}
             onChange={setSelected}
-            disabledReason={u =>
-              u.id === teamId ? "Inhaber"
-              : memberIds.includes(u.id) ? "Schon im Team"
-              : u.is_admin ? "Admin"
-              : u.memberCount > 0 ? "Eigenes Team"
-              : null}
-            noteFor={u => (u.parent_account_id ? `wechselt von ${u.teamName}` : null)}
+            disabledReason={u => (memberIds.includes(u.id) ? "Schon im Team" : null)}
+            noteFor={u => {
+              const others = u.teams.filter((_, i) => u.teamIds[i] !== teamId)
+              return others.length ? `auch in: ${others.join(", ")}` : null
+            }}
           />
           {error && <ErrorBox>{error}</ErrorBox>}
           <div className="flex items-center justify-end gap-2 pt-2">
@@ -377,17 +361,17 @@ function DeleteTeamModal({
   return (
     <ModalShell onClose={onClose} title="Team löschen">
       <p className="text-sm text-[var(--foreground)]">
-        Der Inhaber von <span className="font-semibold">{name}</span> wird samt allen Themen, Messungen und Berichten endgültig gelöscht.
+        Das Team <span className="font-semibold">{name}</span> wird endgültig gelöscht.
       </p>
       {memberCount > 0 && (
         <div className="space-y-2">
           <label className="flex items-start gap-3 p-3 border border-[var(--border-subtle)] rounded-lg cursor-pointer">
             <input type="radio" checked={!withMembers} onChange={() => setWithMembers(false)} className="mt-0.5 accent-[var(--accent)]" />
-            <span className="text-sm">{memberCount} Mitglieder behalten, sie werden zu Einzelpersonen</span>
+            <span className="text-sm">Alle {memberCount} Mitglieder behalten (nur das Team verschwindet)</span>
           </label>
           <label className="flex items-start gap-3 p-3 border border-[var(--danger)]/30 rounded-lg cursor-pointer">
             <input type="radio" checked={withMembers} onChange={() => setWithMembers(true)} className="mt-0.5 accent-[var(--danger)]" />
-            <span className="text-sm text-[var(--danger)]">Auch alle {memberCount} Mitglieder samt Daten löschen</span>
+            <span className="text-sm text-[var(--danger)]">Auch die Konten aller {memberCount} Mitglieder samt Daten löschen (auch wenn sie in anderen Teams sind)</span>
           </label>
         </div>
       )}

@@ -7,6 +7,7 @@ import type {
   MonitoringSchedule,
   VisibilityReport,
   FrequencyType,
+  TeamRef,
 } from "@/lib/supabase/admin"
 import Link from "next/link"
 import {
@@ -30,11 +31,13 @@ export default function UserDetailClient({
   profile,
   schedules,
   reports,
+  teams,
   currentAdminId,
 }: {
   profile: Profile
   schedules: MonitoringSchedule[]
   reports: VisibilityReport[]
+  teams: TeamRef[]
   currentAdminId: string
 }) {
   const router = useRouter()
@@ -148,16 +151,11 @@ export default function UserDetailClient({
               <button type="button" onClick={() => setPasswordOpen(true)} disabled={isPending} className={btnSmall}>
                 Passwort setzen
               </button>
-              {profile.parent_account_id && (
-                <Link href={`/dashboard/teams/${profile.parent_account_id}`} className={btnSmall}>
-                  Zum Team →
+              {teams.map(t => (
+                <Link key={t.id} href={`/dashboard/teams/${t.id}`} className={btnSmall}>
+                  Team: {t.name} →
                 </Link>
-              )}
-              {profile.plan === "enterprise" && (
-                <Link href={`/dashboard/teams/${profile.id}`} className={btnSmall}>
-                  Team verwalten →
-                </Link>
-              )}
+              ))}
               {confirmDelete ? (
                 <>
                   <button

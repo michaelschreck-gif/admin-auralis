@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useTransition, useState, useEffect } from "react"
-import type { Profile, PlanType, StatusFilter, KindFilter, LanguageType, TeamInfo } from "@/lib/supabase/admin"
+import type { Profile, PlanType, StatusFilter, KindFilter, LanguageType, TeamRef } from "@/lib/supabase/admin"
 import { ModalShell, Field, SetPasswordModal, PasswordField, ErrorBox, extractError, inputCls, btnPrimary, btnGhost } from "./ui"
 import { validatePassword } from "@/lib/accounts"
 import {
@@ -44,8 +44,8 @@ const PLAN_FILTERS: { value: PlanType | "all"; label: string }[] = [
 
 const KIND_FILTERS: { value: KindFilter; label: string }[] = [
   { value: "all",    label: "Alle" },
-  { value: "single", label: "Einzelpersonen" },
-  { value: "member", label: "Teammitglieder" },
+  { value: "single", label: "Ohne Team" },
+  { value: "member", label: "In Teams" },
 ]
 
 export default function UserTable({
@@ -56,7 +56,7 @@ export default function UserTable({
   status,
   plan,
   kind,
-  teamInfo,
+  teamsByProfile,
   currentAdminId,
 }: {
   users: Profile[]
@@ -66,7 +66,7 @@ export default function UserTable({
   status: StatusFilter
   plan: PlanType | "all"
   kind: KindFilter
-  teamInfo: TeamInfo
+  teamsByProfile: Record<string, TeamRef[]>
   currentAdminId: string
 }) {
   const router = useRouter()
@@ -284,23 +284,16 @@ export default function UserTable({
                           Admin
                         </span>
                       )}
-                      {(teamInfo.memberCountByOwner[user.id] ?? 0) > 0 && (
+                      {(teamsByProfile[user.id] ?? []).map(t => (
                         <Link
-                          href={`/dashboard/teams/${user.id}`}
-                          className="text-xs px-2 py-0.5 rounded-full bg-teal-50 text-teal-700 font-medium border border-teal-100 hover:underline"
-                        >
-                          Team · {teamInfo.memberCountByOwner[user.id]}
-                        </Link>
-                      )}
-                      {user.parent_account_id && (
-                        <Link
-                          href={`/dashboard/teams/${user.parent_account_id}`}
+                          key={t.id}
+                          href={`/dashboard/teams/${t.id}`}
                           className="text-xs px-2 py-0.5 rounded-full bg-teal-50 text-teal-700 font-medium border border-teal-100 hover:underline"
                           title="Zum Team"
                         >
-                          Mitglied · {teamInfo.teamNameById[user.parent_account_id] ?? "Team"}
+                          {t.name}
                         </Link>
-                      )}
+                      ))}
                       {isSelf && (
                         <span className="text-xs px-2 py-0.5 rounded-full bg-[var(--accent-soft)] text-[var(--accent)] font-medium border border-[var(--accent)]/20">
                           Du

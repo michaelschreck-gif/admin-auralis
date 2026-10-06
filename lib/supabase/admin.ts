@@ -1,6 +1,5 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js"
 import type { Database, Tables, TablesUpdate } from "./database.types"
-import { teamLabel } from "../accounts"
 
 /**
  * Lazily instantiated service-role client.
@@ -32,7 +31,7 @@ export type PlanType = Database["public"]["Enums"]["plan_type"]
 export type LanguageType = Database["public"]["Enums"]["language_type"]
 
 export type StatusFilter = "all" | "active" | "banned" | "admin"
-/** Einzelpersonen = ohne Team-Zuordnung, Teammitglieder = mit Eltern-Konto. */
+/** "single" = in keinem Team, "member" = in mindestens einem Team. */
 export type KindFilter = "all" | "single" | "member"
 
 export async function getUsers(
@@ -68,10 +67,14 @@ export async function getUsers(
     query = query.eq("plan", plan)
   }
 
-  if (kind === "single") {
-    query = query.is("parent_account_id", null)
-  } else if (kind === "member") {
-    query = query.not("parent_account_id", "is", null)
+  if (kind !== "all") {
+    const memberIds = await getAllMemberIds()
+    if (kind === "member") {
+      // leere Liste = nichts treffen
+      query = query.in("id", memberIds.length ? memberIds : ["00000000-0000-0000-0000-000000000000"])
+    } else if (memberIds.length) {
+      query = query.not("id", "in", `(${memberIds.join(",")})`)
+    }
   }
 
   return query
@@ -86,7 +89,7 @@ export async function updateUserPlan(userId: string, plan: PlanType) {
 
 type UpdateProfilePatch = Pick<
   TablesUpdate<"profiles">,
-  "full_name" | "language" | "is_admin" | "team_name"
+  "full_name" | "language" | "is_admin"
 >
 
 export async function updateUserProfile(userId: string, patch: UpdateProfilePatch) {
@@ -130,11 +133,7 @@ export async function countAdmins() {
 }
 
 /* ─────────────────────────────────────────────────────────
- * Kontenverwaltung: Nutzer anlegen, Passwort setzen, Teams
- *
- * Ein Team ist ein Enterprise-Konto (Inhaber) plus Mitglieder, deren
- * profiles.parent_account_id auf den Inhaber zeigt – dasselbe Modell,
- * das das Haupt-Tool (Team-Ansicht, /api/v1/sub-accounts) verwendet.
+ * Kontenverwaltung: Nutzer anlegen, Passwort setzen
  * ───────────────────────────────────────────────────────── */
 
 export type CreateAccountInput = {
@@ -144,9 +143,7 @@ export type CreateAccountInput = {
   language: LanguageType
   /** Leer = "verwaltet ohne eigenen Login" (zufälliges, nicht ausgegebenes Passwort). */
   password?: string
-  parentId?: string | null
   isAdmin?: boolean
-  teamName?: string | null
 }
 
 export type CreateAccountResult =
@@ -179,9 +176,7 @@ export async function createAccount(input: CreateAccountInput): Promise<CreateAc
       full_name: input.fullName,
       plan: input.plan,
       language: input.language,
-      parent_account_id: input.parentId ?? null,
       is_admin: input.isAdmin ?? false,
-      ...(input.teamName ? { team_name: input.teamName } : {}),
     })
     .eq("id", id)
 
@@ -202,21 +197,6 @@ export async function setUserPassword(userId: string, password: string) {
   return adminClient().auth.admin.updateUserById(userId, { password })
 }
 
-export async function setUserParent(userId: string, parentId: string | null) {
-  return adminClient()
-    .from("profiles")
-    .update({ parent_account_id: parentId })
-    .eq("id", userId)
-}
-
-export async function getProfileByEmail(email: string) {
-  return adminClient()
-    .from("profiles")
-    .select("*")
-    .eq("email", email)
-    .maybeSingle()
-}
-
 export async function searchProfiles(query: string, limit = 10): Promise<Profile[]> {
   const q = query.replace(/[%,()]/g, " ").trim()
   let req = adminClient().from("profiles").select("*").order("created_at", { ascending: false }).limit(limit)
@@ -231,74 +211,115 @@ export async function getProfilesByIds(ids: string[]): Promise<Profile[]> {
   return data ?? []
 }
 
-/** Anzeige-Infos zur Teamzugehörigkeit für eine Seite von Nutzern. */
-export type TeamInfo = {
-  /** Eltern-ID → Name des Teams (Name des Inhabers). */
-  teamNameById: Record<string, string>
-  /** Inhaber-ID → Anzahl Mitglieder. */
-  memberCountByOwner: Record<string, number>
+/* ── Teams (many-to-many): teams + team_members ───────────────────── */
+
+export type Team = { id: string; name: string; created_at: string }
+export type TeamRow = Team & { memberCount: number }
+export type TeamRef = { id: string; name: string }
+
+/** Die Team-Tabellen sind nicht in database.types.ts; daher ein ungetypter Client. */
+function db(): SupabaseClient {
+  return adminClient() as unknown as SupabaseClient
 }
 
-export async function getTeamInfoFor(users: Profile[]): Promise<TeamInfo> {
-  const client = adminClient()
-  const parentIds = Array.from(
-    new Set(users.map(u => u.parent_account_id).filter((x): x is string => !!x)),
-  )
-  const ownerCandidates = users.map(u => u.id)
+const MIGRATION_HINT =
+  "Die Team-Tabellen fehlen noch in der Datenbank (Migration 20261006150000_teams.sql ausführen)."
 
-  const [parents, members] = await Promise.all([
-    parentIds.length
-      ? client.from("profiles").select("id, full_name, team_name, email").in("id", parentIds)
-      : Promise.resolve({ data: [] as { id: string; full_name: string | null; team_name: string | null; email: string }[] }),
-    ownerCandidates.length
-      ? client.from("profiles").select("parent_account_id").in("parent_account_id", ownerCandidates)
-      : Promise.resolve({ data: [] as { parent_account_id: string | null }[] }),
-  ])
-
-  const teamNameById: Record<string, string> = {}
-  for (const p of parents.data ?? []) teamNameById[p.id] = teamLabel(p)
-  const memberCountByOwner: Record<string, number> = {}
-  for (const m of members.data ?? []) {
-    if (m.parent_account_id) {
-      memberCountByOwner[m.parent_account_id] = (memberCountByOwner[m.parent_account_id] ?? 0) + 1
-    }
-  }
-  return { teamNameById, memberCountByOwner }
+function teamError(message: string): Error {
+  return new Error(/teams|team_members|schema cache/i.test(message) ? MIGRATION_HINT : message)
 }
 
-export type TeamRow = {
-  owner: Profile
-  memberCount: number
-}
-
-/** Alle Teams: Enterprise-Konten ohne Eltern-Konto sowie jedes Konto mit Mitgliedern. */
 export async function getTeams(): Promise<TeamRow[]> {
-  const client = adminClient()
-  const [enterprise, children] = await Promise.all([
-    client.from("profiles").select("*").eq("plan", "enterprise").is("parent_account_id", null),
-    client.from("profiles").select("parent_account_id").not("parent_account_id", "is", null),
+  const [teams, members] = await Promise.all([
+    db().from("teams").select("id, name, created_at").order("name", { ascending: true }),
+    db().from("team_members").select("team_id"),
   ])
+  if (teams.error) throw teamError(teams.error.message)
   const counts = new Map<string, number>()
-  for (const c of children.data ?? []) {
-    if (c.parent_account_id) counts.set(c.parent_account_id, (counts.get(c.parent_account_id) ?? 0) + 1)
+  for (const m of (members.data ?? []) as { team_id: string }[]) {
+    counts.set(m.team_id, (counts.get(m.team_id) ?? 0) + 1)
   }
-  const owners = new Map<string, Profile>()
-  for (const p of enterprise.data ?? []) owners.set(p.id, p)
-  const missing = Array.from(counts.keys()).filter(id => !owners.has(id))
-  for (const p of await getProfilesByIds(missing)) owners.set(p.id, p)
-
-  return Array.from(owners.values())
-    .map(owner => ({ owner, memberCount: counts.get(owner.id) ?? 0 }))
-    .sort((a, b) => teamLabel(a.owner).localeCompare(teamLabel(b.owner), "de"))
+  return ((teams.data ?? []) as Team[])
+    .map(t => ({ ...t, memberCount: counts.get(t.id) ?? 0 }))
+    .sort((a, b) => a.name.localeCompare(b.name, "de"))
 }
 
-export async function getTeamMembers(ownerId: string): Promise<Profile[]> {
-  const { data } = await adminClient()
-    .from("profiles")
-    .select("*")
-    .eq("parent_account_id", ownerId)
+export async function getTeam(teamId: string): Promise<Team | null> {
+  const { data, error } = await db().from("teams").select("id, name, created_at").eq("id", teamId).maybeSingle()
+  if (error) throw teamError(error.message)
+  return (data as Team | null) ?? null
+}
+
+export async function getTeamMembers(teamId: string): Promise<Profile[]> {
+  const { data, error } = await db()
+    .from("team_members")
+    .select("profile_id, created_at")
+    .eq("team_id", teamId)
     .order("created_at", { ascending: true })
-  return data ?? []
+  if (error) throw teamError(error.message)
+  const ids = ((data ?? []) as { profile_id: string }[]).map(r => r.profile_id)
+  const people = await getProfilesByIds(ids)
+  const order = new Map(ids.map((id, i) => [id, i]))
+  return people.sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0))
+}
+
+/** Teams je Person (für Badges und Auswahllisten). */
+export async function getTeamsForProfiles(profileIds: string[]): Promise<Record<string, TeamRef[]>> {
+  const out: Record<string, TeamRef[]> = {}
+  if (profileIds.length === 0) return out
+  const { data, error } = await db().from("team_members").select("team_id, profile_id").in("profile_id", profileIds)
+  if (error) return out // Tabellen fehlen: Nutzerliste soll trotzdem laden
+  const rows = (data ?? []) as { team_id: string; profile_id: string }[]
+  const teamIds = Array.from(new Set(rows.map(r => r.team_id)))
+  if (teamIds.length === 0) return out
+  const { data: teams } = await db().from("teams").select("id, name").in("id", teamIds)
+  const nameById = new Map(((teams ?? []) as TeamRef[]).map(t => [t.id, t.name]))
+  for (const r of rows) {
+    const name = nameById.get(r.team_id)
+    if (!name) continue
+    ;(out[r.profile_id] ??= []).push({ id: r.team_id, name })
+  }
+  return out
+}
+
+/** IDs aller Personen, die in mindestens einem Team sind. */
+export async function getAllMemberIds(): Promise<string[]> {
+  const { data, error } = await db().from("team_members").select("profile_id")
+  if (error) return []
+  return Array.from(new Set(((data ?? []) as { profile_id: string }[]).map(r => r.profile_id)))
+}
+
+export async function createTeamRow(name: string): Promise<Team> {
+  const { data, error } = await db().from("teams").insert({ name }).select("id, name, created_at").single()
+  if (error) throw teamError(error.message)
+  return data as Team
+}
+
+export async function renameTeamRow(teamId: string, name: string) {
+  const { error } = await db().from("teams").update({ name }).eq("id", teamId)
+  if (error) throw teamError(error.message)
+}
+
+export async function deleteTeamRow(teamId: string) {
+  const { error } = await db().from("teams").delete().eq("id", teamId)
+  if (error) throw teamError(error.message)
+}
+
+/** Fügt Personen hinzu; wer schon Mitglied ist, wird übersprungen. Liefert die neu hinzugefügten IDs. */
+export async function addTeamMembers(teamId: string, profileIds: string[]): Promise<string[]> {
+  const { data: existing, error: e1 } = await db().from("team_members").select("profile_id").eq("team_id", teamId)
+  if (e1) throw teamError(e1.message)
+  const have = new Set(((existing ?? []) as { profile_id: string }[]).map(r => r.profile_id))
+  const fresh = Array.from(new Set(profileIds)).filter(id => !have.has(id))
+  if (fresh.length === 0) return []
+  const { error } = await db().from("team_members").insert(fresh.map(profile_id => ({ team_id: teamId, profile_id })))
+  if (error) throw teamError(error.message)
+  return fresh
+}
+
+export async function removeTeamMember(teamId: string, profileId: string) {
+  const { error } = await db().from("team_members").delete().eq("team_id", teamId).eq("profile_id", profileId)
+  if (error) throw teamError(error.message)
 }
 
 /* ─────────────────────────────────────────────────────────

@@ -4,6 +4,8 @@ import {
   getUserById,
   getSchedulesForProfile,
   getReportsForProfile,
+  getTeamsForProfiles,
+  type TeamRef,
   type Profile,
   type MonitoringSchedule,
   type VisibilityReport,
@@ -33,6 +35,7 @@ export default async function UserDetailPage({
   let profile: Profile | null = null
   let schedules: MonitoringSchedule[] = []
   let reports: VisibilityReport[] = []
+  let teams: TeamRef[] = []
   let loadError: string | null = null
 
   try {
@@ -57,6 +60,7 @@ export default async function UserDetailPage({
     profile = profileData
     schedules = schedulesRes.data ?? []
     reports = reportsRes.data ?? []
+    teams = (await getTeamsForProfiles([id]))[id] ?? []
   } catch (e) {
     loadError = e instanceof Error ? e.message : "Unbekannter Fehler beim Laden"
   }
@@ -91,6 +95,7 @@ export default async function UserDetailPage({
           profile={profile}
           schedules={schedules}
           reports={reports}
+          teams={teams}
           currentAdminId={currentAdminId}
         />
       )}

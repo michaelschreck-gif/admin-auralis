@@ -3,11 +3,10 @@
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useState, useTransition } from "react"
-import type { TeamRow, LanguageType } from "@/lib/supabase/admin"
-import { validatePassword, teamLabel } from "@/lib/accounts"
+import type { TeamRow } from "@/lib/supabase/admin"
 import { actionCreateTeam } from "../api"
 import {
-  ModalShell, Field, PasswordField, ErrorBox, UserPicker, extractError,
+  ModalShell, Field, ErrorBox, UserPicker, extractError,
   inputCls, btnPrimary, btnGhost,
 } from "../ui"
 
@@ -22,10 +21,7 @@ export default function TeamsClient({
   const [query, setQuery] = useState("")
 
   const q = query.trim().toLowerCase()
-  const shown = q
-    ? teams.filter(t =>
-        teamLabel(t.owner).toLowerCase().includes(q) || (t.owner.full_name ?? "").toLowerCase().includes(q) || t.owner.email.toLowerCase().includes(q))
-    : teams
+  const shown = q ? teams.filter(t => t.name.toLowerCase().includes(q)) : teams
   const totalMembers = teams.reduce((n, t) => n + t.memberCount, 0)
 
   return (
@@ -42,7 +38,7 @@ export default function TeamsClient({
           + Team anlegen
         </button>
         <span className="text-sm text-[var(--text-muted)]">
-          {teams.length} Teams · {totalMembers} Mitglieder
+          {teams.length} Teams · {totalMembers} Zuordnungen
         </span>
       </div>
 
@@ -52,7 +48,7 @@ export default function TeamsClient({
         <table className="w-full text-sm">
           <thead className="bg-[var(--surface-muted)] border-b border-[var(--border-subtle)]">
             <tr>
-              {["Team", "Inhaber", "Mitglieder", "Tarif", "Erstellt"].map(h => (
+              {["Team", "Mitglieder", "Erstellt"].map(h => (
                 <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider">{h}</th>
               ))}
               <th className="px-4 py-3" />
@@ -61,27 +57,25 @@ export default function TeamsClient({
           <tbody className="divide-y divide-gray-50">
             {shown.length === 0 && (
               <tr>
-                <td colSpan={6} className="text-center py-12 text-[var(--text-faint)] text-sm">
+                <td colSpan={4} className="text-center py-12 text-[var(--text-faint)] text-sm">
                   {teams.length === 0 ? "Noch keine Teams. Lege das erste mit „+ Team anlegen“ an." : "Kein Team gefunden."}
                 </td>
               </tr>
             )}
             {shown.map(t => (
-              <tr key={t.owner.id} className="hover:bg-[var(--surface-muted)] transition-colors">
+              <tr key={t.id} className="hover:bg-[var(--surface-muted)] transition-colors">
                 <td className="px-4 py-3">
-                  <Link href={`/dashboard/teams/${t.owner.id}`} className="font-medium text-[var(--foreground)] hover:text-[var(--accent)]">
-                    {teamLabel(t.owner)}
+                  <Link href={`/dashboard/teams/${t.id}`} className="font-medium text-[var(--foreground)] hover:text-[var(--accent)]">
+                    {t.name}
                   </Link>
                 </td>
-                <td className="px-4 py-3 text-xs text-[var(--text-muted)]">{t.owner.full_name ? `${t.owner.full_name} · ` : ""}{t.owner.email}</td>
                 <td className="px-4 py-3 text-[var(--text-muted)]">{t.memberCount}</td>
-                <td className="px-4 py-3 text-xs capitalize text-[var(--text-muted)]">{t.owner.plan}</td>
                 <td className="px-4 py-3 text-xs text-[var(--text-muted)]">
-                  {new Date(t.owner.created_at).toLocaleDateString("de-DE", { day: "2-digit", month: "short", year: "numeric" })}
+                  {new Date(t.created_at).toLocaleDateString("de-DE", { day: "2-digit", month: "short", year: "numeric" })}
                 </td>
                 <td className="px-4 py-3 text-right">
                   <Link
-                    href={`/dashboard/teams/${t.owner.id}`}
+                    href={`/dashboard/teams/${t.id}`}
                     className="text-xs px-3 py-1.5 rounded-lg border border-[var(--border-subtle)] text-[var(--text-muted)] hover:border-[var(--accent)] hover:text-[var(--accent)] transition-colors"
                   >
                     Verwalten
@@ -100,145 +94,47 @@ export default function TeamsClient({
 
 function CreateTeamModal({ onClose }: { onClose: () => void }) {
   const router = useRouter()
-  const [mode, setMode] = useState<"existing" | "new">("existing")
-  const [teamName, setTeamName] = useState("")
-  const [contactName, setContactName] = useState("")
-  const [ownerEmail, setOwnerEmail] = useState("")
-  const [password, setPassword] = useState("")
-  const [ownerId, setOwnerId] = useState<string[]>([])
-  const [language, setLanguage] = useState<LanguageType>("de")
+  const [name, setName] = useState("")
+  const [memberIds, setMemberIds] = useState<string[]>([])
   const [error, setError] = useState<string | null>(null)
-  const [created, setCreated] = useState<{ id: string; email?: string; password?: string } | null>(null)
   const [isPending, startTransition] = useTransition()
 
   function save() {
-    if (mode === "new") {
-      const v = validatePassword(password)
-      if (v) { setError(v); return }
-    }
     setError(null)
     startTransition(async () => {
       try {
-        const res = await actionCreateTeam(
-          mode === "new"
-            ? { teamName, language, owner: { mode: "new", email: ownerEmail, password, contactName } }
-            : { teamName, language, owner: { mode: "existing", userId: ownerId[0] } },
-        )
-        setCreated(mode === "new"
-          ? { id: res.id, email: ownerEmail.trim().toLowerCase(), password }
-          : { id: res.id })
+        const res = await actionCreateTeam({ name, memberIds })
+        router.push(`/dashboard/teams/${res.id}`)
       } catch (e) {
         setError(extractError(e))
       }
     })
   }
 
-  const tab = (m: "existing" | "new", label: string) => (
-    <button
-      type="button"
-      onClick={() => { setMode(m); setError(null) }}
-      className={`flex-1 text-sm px-3 py-2 rounded-lg border transition-colors ${
-        mode === m
-          ? "bg-[var(--accent)] text-white border-[var(--accent)]"
-          : "bg-white text-[var(--text-muted)] border-[var(--border-subtle)] hover:border-[var(--accent)]"
-      }`}
-    >
-      {label}
-    </button>
-  )
-
   return (
     <ModalShell onClose={onClose} title="Team anlegen">
-      {created ? (
-        <>
-          <div className="rounded-lg bg-green-50 border border-green-100 px-4 py-3 space-y-1">
-            {created.password ? (
-              <>
-                <p className="text-xs text-green-700 font-medium">Team angelegt. Zugangsdaten des Inhabers, werden nicht noch einmal angezeigt:</p>
-                <p className="text-sm text-green-800 break-all">{created.email}</p>
-                <p className="text-sm font-mono text-green-800 select-all break-all">{created.password}</p>
-              </>
-            ) : (
-              <p className="text-xs text-green-700 font-medium">Team angelegt. Der gewählte Nutzer ist jetzt Inhaber (Tarif Enterprise), sein Passwort bleibt unverändert.</p>
-            )}
-          </div>
-          <div className="flex justify-end gap-2 pt-2">
-            <button type="button" onClick={onClose} className={btnGhost}>Schließen</button>
-            <button type="button" onClick={() => router.push(`/dashboard/teams/${created.id}`)} className={btnPrimary}>
-              Mitglieder hinzufügen →
-            </button>
-          </div>
-        </>
-      ) : (
-        <>
-          <p className="text-xs text-[var(--text-muted)]">
-            Ein Team besteht aus einem Inhaber (Enterprise-Konto) und beliebig vielen Mitgliedern, die du danach hinzufügst.
-          </p>
-          <Field label="Teamname / Firma">
-            <input type="text" value={teamName} onChange={e => setTeamName(e.target.value)} placeholder="z.B. Muster GmbH" autoFocus className={inputCls} />
-          </Field>
-
-          <div className="space-y-2">
-            <p className="text-xs text-[var(--text-muted)] font-medium uppercase tracking-wider">Inhaber des Teams</p>
-            <div className="flex gap-2">
-              {tab("existing", "Bestehender Nutzer")}
-              {tab("new", "Neues Konto")}
-            </div>
-          </div>
-
-          {mode === "existing" ? (
-            <Field label="Inhaber auswählen" hint="Der Inhaber wird auf Enterprise gestellt. Sein Passwort und Name bleiben unverändert.">
-              <UserPicker
-                mode="single"
-                selected={ownerId}
-                onChange={setOwnerId}
-                disabledReason={u =>
-                  u.parent_account_id ? `Mitglied in ${u.teamName}`
-                  : u.memberCount > 0 ? `Hat schon ein Team${u.team_name ? `: ${u.team_name}` : ""}`
-                  : null}
-                noteFor={u => (u.plan === "enterprise" ? "Enterprise" : null)}
-              />
-            </Field>
-          ) : (
-            <>
-              <Field label="E-Mail des Inhabers">
-                <input type="email" value={ownerEmail} onChange={e => setOwnerEmail(e.target.value)} placeholder="inhaber@firma.de" className={inputCls} />
-              </Field>
-              <Field label="Name des Inhabers (optional)">
-                <input type="text" value={contactName} onChange={e => setContactName(e.target.value)} placeholder="Ansprechperson" className={inputCls} />
-              </Field>
-              <PasswordField value={password} onChange={setPassword} hint="Mindestens 10 Zeichen." />
-              <Field label="Sprache">
-                <select value={language} onChange={e => setLanguage(e.target.value as LanguageType)} className={inputCls}>
-                  <option value="de">Deutsch</option>
-                  <option value="en">English</option>
-                  <option value="fr">Français</option>
-                  <option value="es">Español</option>
-                  <option value="it">Italiano</option>
-                  <option value="nl">Nederlands</option>
-                  <option value="pt">Português</option>
-                </select>
-              </Field>
-            </>
-          )}
-
-          {error && <ErrorBox>{error}</ErrorBox>}
-          <div className="flex items-center justify-end gap-2 pt-2">
-            <button type="button" onClick={onClose} disabled={isPending} className={btnGhost}>Abbrechen</button>
-            <button
-              type="button"
-              onClick={save}
-              disabled={
-                isPending ||
-                !teamName.trim() || (mode === "existing" ? ownerId.length === 0 : !ownerEmail.trim() || !password)
-              }
-              className={btnPrimary}
-            >
-              {isPending ? "Legt an…" : "Team anlegen"}
-            </button>
-          </div>
-        </>
-      )}
+      <Field label="Teamname / Firma">
+        <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="z.B. Muster GmbH" autoFocus className={inputCls} />
+      </Field>
+      <Field
+        label={`Mitglieder auswählen (${memberIds.length})`}
+        hint="Beliebig viele. Eine Person kann in mehreren Teams sein. Neue Konten legst du danach in der Teamansicht an."
+      >
+        <UserPicker
+          mode="multi"
+          selected={memberIds}
+          onChange={setMemberIds}
+          disabledReason={() => null}
+          noteFor={u => (u.teams.length ? `in: ${u.teams.join(", ")}` : null)}
+        />
+      </Field>
+      {error && <ErrorBox>{error}</ErrorBox>}
+      <div className="flex items-center justify-end gap-2 pt-2">
+        <button type="button" onClick={onClose} disabled={isPending} className={btnGhost}>Abbrechen</button>
+        <button type="button" onClick={save} disabled={isPending || !name.trim()} className={btnPrimary}>
+          {isPending ? "Legt an…" : memberIds.length ? `Team mit ${memberIds.length} Mitgliedern anlegen` : "Team anlegen"}
+        </button>
+      </div>
     </ModalShell>
   )
 }
