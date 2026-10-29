@@ -2,7 +2,7 @@
 
 Administrationsoberfläche für [Auralis](https://github.com/michaelschreck-gif/auralis) – das KI-Visibility-Monitoring-Tool.
 
-Live: [admin-auralis.vercel.app](https://admin-auralis.vercel.app)
+Live: [admin.digital-halo.de](https://admin.digital-halo.de) (weiterhin auch unter admin-auralis.vercel.app)
 
 ---
 
@@ -62,7 +62,8 @@ npm run dev
 
 - Vercel-Projekt: `auralis-projects1/admin-auralis`
 - Auto-deploy bei push auf `main`
-- Custom-Domain: aktuell `admin-auralis.vercel.app`
+- Custom-Domain: `admin.digital-halo.de` (DNS bei Strato: CNAME `admin` → Vercel), Supabase-Redirect `https://admin.digital-halo.de/auth/callback`
+- `NEXT_PUBLIC_MAIN_APP_URL` = `https://app.digital-halo.de` (Production)
 
 ## Routen
 
