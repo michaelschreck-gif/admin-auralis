@@ -40,19 +40,22 @@ export type LLMProvider = {
 
 const DEFAULT_MAX_TOKENS = 600
 
+/** Wie im Haupt-Repo: claude-sonnet-4-5 ist seit 10/2026 nicht mehr verfügbar (404). */
+export const CLAUDE_MODEL = "claude-sonnet-5-5"
+
 // ─── Anthropic Claude Sonnet ────────────────────────────────────────────────
 
 export const claudeProvider: LLMProvider = {
   id: "claude-sonnet",
   label: "Claude Sonnet",
-  modelTag: "claude-sonnet-4-5",
+  modelTag: CLAUDE_MODEL,
   isConfigured: () => !!process.env.ANTHROPIC_API_KEY,
   async call(prompt, systemPrompt, maxTokens = DEFAULT_MAX_TOKENS) {
     const apiKey = process.env.ANTHROPIC_API_KEY
     if (!apiKey) throw new Error("ANTHROPIC_API_KEY missing")
     const client = new Anthropic({ apiKey })
     const message = await client.messages.create({
-      model: "claude-sonnet-4-5",
+      model: CLAUDE_MODEL,
       max_tokens: maxTokens,
       system: systemPrompt,
       messages: [{ role: "user", content: prompt }],
