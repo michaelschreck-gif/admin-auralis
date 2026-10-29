@@ -16,6 +16,7 @@
  */
 
 import Anthropic from "@anthropic-ai/sdk"
+import type { ThinkingConfigParam } from "@anthropic-ai/sdk/resources/messages"
 import type { Database } from "@/lib/supabase/database.types"
 
 type PlanType = Database["public"]["Enums"]["plan_type"]
@@ -43,6 +44,13 @@ const DEFAULT_MAX_TOKENS = 600
 /** Wie im Haupt-Repo: claude-sonnet-4-5 ist seit 10/2026 nicht mehr verfügbar (404). */
 export const CLAUDE_MODEL = "claude-sonnet-5-5"
 
+/**
+ * Sonnet 5.5 denkt standardmäßig, die Denk-Tokens fressen max_tokens (leere
+ * Antworten). `disabled` ist ein 400, nur `between_tools` schaltet es ab.
+ * SDK 0.96 kennt den Typ noch nicht, daher der Cast.
+ */
+const CLAUDE_NO_THINKING = { type: "between_tools" } as unknown as ThinkingConfigParam
+
 // ─── Anthropic Claude Sonnet ────────────────────────────────────────────────
 
 export const claudeProvider: LLMProvider = {
@@ -56,6 +64,7 @@ export const claudeProvider: LLMProvider = {
     const client = new Anthropic({ apiKey })
     const message = await client.messages.create({
       model: CLAUDE_MODEL,
+      thinking: CLAUDE_NO_THINKING,
       max_tokens: maxTokens,
       system: systemPrompt,
       messages: [{ role: "user", content: prompt }],
