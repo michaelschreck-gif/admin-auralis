@@ -19,7 +19,7 @@ Live: [admin.digital-halo.de](https://admin.digital-halo.de) (weiterhin auch unt
 - **Next.js 16.2.6** (App Router, Turbopack) – `proxy.ts` statt klassischer `middleware.ts`
 - **React 19.2.4** + **Tailwind v4**
 - **Supabase** (`@supabase/ssr` für SSR-Auth, `@supabase/supabase-js` mit Service-Role für Admin-Operationen)
-- **Anthropic SDK** für manuelle Analyse-Trigger (Modell `claude-sonnet-4-5`)
+- **Anthropic SDK** für manuelle Analyse-Trigger (Modell `claude-sonnet-5-5`)
 - Geteiltes Datenbank-Schema mit dem Haupt-Tool, eigene Migration für `audit_log` (siehe `auralis/supabase/migrations/`)
 
 ## Auth-Modell
